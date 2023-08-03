@@ -1,0 +1,359 @@
+﻿@page "/food"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization;
+@using QLCF.Repositories.Interfaces;
+@using QuanLyCF.BLL.ViewModels.Category;
+@using QuanLyCF.BLL.ViewModels.Food;
+@using QuanLyCF.DAL.Enums;
+
+@if (_listCategory != null && _listFood != null)
+{
+    <div class="box fadeInDown" style="height: 88vh;">
+        <div style="width: 50%" class="table_box container text-center">
+            <div style="margin: 20px 0 40px 0;display: flex;justify-content: space-between;">
+                <div @onclick="()=>OnShowModalClick()" style="min-width: 120px;" class="button wood">
+                    <div>Thêm món</div>
+                </div>
+                <div @onclick="async()=>await UpdateFood()" style="min-width: 120px;" class="button wood">
+                    <div>Sửa món</div>
+                </div>
+                <div @onclick="()=>DeleteFood()" style="min-width: 120px;" class="button wood">
+                    <div>Xóa món</div>
+                </div>
+            </div>
+            <div style="height: 400px;overflow: scroll; box-shadow: 0 0 20px black; border-radius: 8px;">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th scope="col">STT</th>
+                            <th scope="col">Tên món</th>
+                            <th scope="col">Đơn giá</th>
+                            <th scope="col">Danh mục</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in _listFood.Select((value, index) => (value, index)))
+                        {
+                            if (_currentFood != null && _listFood.FindIndex(0, p => p.FoodId == _currentFood.FoodId) == item.index)
+                            {
+                                <tr style="background-color:rgba(0,0,0,0.2)" @onclick="async()=>await GetCurrentFood(item.value)">
+                                    <th scope="row">@(item.index + 1)</th>
+                                    <td>@item.value.Name</td>
+                                    <td>@RenderPrice(item.value.Price)</td>
+                                    <td>@GetCategoryName(item.value.CategoryId)</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                <tr @onclick="async()=>await GetCurrentFood(item.value)">
+                                    <th scope="row">@(item.index + 1)</th>
+                                    <td>@item.value.Name</td>
+                                    <td>@RenderPrice(item.value.Price)</td>
+                                    <td>@GetCategoryName(item.value.CategoryId)</td>
+                                </tr>
+
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div style="width: 50%;margin-left: 40px;">
+            <div class="search-box" style="margin: 20px 0 50px 0;padding-left: 70px;">
+                <button class="btn-search"><i class="fas fa-search"></i></button>
+                <input @oninput="async(e)=>await SearchFood(e)" type="text" class="input-search" placeholder="Type to Search...">
+            </div>
+            <div style="margin-top: 20px; display: flex;">
+                <span style="margin-right: 20px;width: 100px;display: block;">Tên món:</span>
+                <input @bind="_currentFoodName" style="width: 320px;" type="text">
+            </div>
+            <div style="margin-top: 20px; display: flex;">
+                <span style="margin-right: 20px;width: 100px;display: block;">Đơn giá:</span>
+                <input @bind="_currentFoodPrice" style="width: 320px;" type="number">
+            </div>
+            <div style="margin-top: 20px; display: flex;">
+                <span style="margin-right: 20px;width: 100px;display: block;">Danh mục:</span>
+                <select @onchange="(value)=>GetCategory(value)" value="@_currentCategoryName" required style="width: 320px;" name="" id="">
+                    <option disabled selected hidden value="">Chọn danh mục</option>
+                    @foreach (var item in _listCategory)
+                    {
+                        <option value="@item.Name">@item.Name</option>
+                    }
+                </select>
+            </div>
+        </div>
+    </div>
+    <Toasts class="p-3" Messages="messages" AutoHide="true" Delay="2000" Placement="ToastsPlacement.TopLeft" />
+    <Modal @ref="modal" Title="Thêm món mới">
+        <BodyTemplate>
+            <div style="display: flex;">
+                <span style="margin-right: 20px;width: 100px;display: block;">Tên món:</span>
+                <input @bind="FoodAdd.Name" style="width: 320px;" type="text">
+            </div>
+            <div style="margin-top: 20px; display: flex;">
+                <span style="margin-right: 20px;width: 100px;display: block;">Đơn giá:</span>
+                <input @bind="FoodAdd.Price" style="width: 320px;" type="number">
+            </div>
+            <div style="margin-top: 20px; display: flex;">
+                <span style="margin-right: 20px;width: 100px;display: block;">Danh mục:</span>
+                <select @onchange="(value)=>GetFoodAddCategory(value)" value="@FoodAdd.Name" required style="width: 320px;" name="" id="">
+                    <option disabled selected hidden value="">Chọn danh mục</option>
+                    @foreach (var item in _listCategory)
+                    {
+                        <option value="@item.Name">@item.Name</option>
+                    }
+                </select>
+            </div>
+        </BodyTemplate>
+        <FooterTemplate>
+            <Button Color="ButtonColor.Secondary" @onclick="async()=>await OnHideModalClick()">Close</Button>
+            <Button @onclick="async()=>await AddFood()" Color="ButtonColor.Primary">Thêm món</Button>
+        </FooterTemplate>
+    </Modal>
+}
+
+@code {
+    [Inject]
+    private ICategoryRepos _categoryRepos { get; set; }
+    [Inject]
+    private IFoodRepos _foodRepos { get; set; }
+
+
+    private List<CategoryVM> _listCategory;
+    private List<FoodVM> _listFood;
+    private CategoryVM _currentCategory;
+    private string _currentCategoryName = "";
+    private FoodVM _currentFood;
+    private string _currentFoodName = "";
+    private string _currentFoodPrice = "";
+    private FoodVM FoodAdd = new FoodVM(){Name=""};
+
+    #region Toast options
+    //Toast options--------------------------------
+    List<ToastMessage> messages = new List<ToastMessage>();
+
+    private ToastMessage CreateToastChooseFood(ToastType toastType)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Lưu ý",
+            HelpText = $"{DateTime.Now}",
+            Message = $"Vui lòng chọn món ăn",
+        };
+    private ToastMessage CreateToastChooseFoodName(ToastType toastType)
+        => new ToastMessage
+            {
+                Type = toastType,
+                Title = "Lưu ý",
+                HelpText = $"{DateTime.Now}",
+                Message = $"Tên món không được để trống",
+            };
+    private ToastMessage CreateToastChooseFoodPrice(ToastType toastType)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Lưu ý",
+            HelpText = $"{DateTime.Now}",
+            Message = $"Vui lòng nhập lại giá món",
+        };
+    private ToastMessage CreateToastUpdateSuccess(ToastType toastType)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Thông báo",
+            HelpText = $"{DateTime.Now}",
+            Message = $"Cập nhật thành công",
+        };
+    private ToastMessage CreateToastDeleteSuccess(ToastType toastType)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Thông báo",
+            HelpText = $"{DateTime.Now}",
+            Message = $"Xóa món thành công",
+        };
+    private ToastMessage CreateToastAddSuccess(ToastType toastType)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Thông báo",
+            HelpText = $"{DateTime.Now}",
+            Message = $"Thêm món thành công",
+        };
+    private ToastMessage CreateToastFillInfo(ToastType toastType)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Lưu ý",
+            HelpText = $"{DateTime.Now}",
+            Message = $"Vui lòng nhập đầy đủ thông tin",
+        };
+    //-----------------------------------------------
+    #endregion
+
+    private string RenderPrice(double price)
+    {
+        var count = 1;
+        var result = "";
+        var firstPrice = price.ToString();
+        for (int i = firstPrice.Length - 1; i >= 0; i--)
+        {
+            result += firstPrice[i];
+            if (count % 3 == 0 && i != 0)
+            {
+                result += ".";
+            }
+            count++;
+        }
+        char[] stringArray = result.ToCharArray();
+        Array.Reverse(stringArray);
+        string reversedStr = new string(stringArray);
+        return reversedStr;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _listFood = await _foodRepos.GetAll();
+        _listCategory = await _categoryRepos.GetAll();
+    }
+
+    private void GetCategory(ChangeEventArgs e)
+    {
+        //_currentCategory = category;
+        _currentCategoryName = e.Value.ToString();
+        _currentCategory = GetCategoryByName(_currentCategoryName);
+
+    }
+
+    private void GetFoodAddCategory(ChangeEventArgs e)
+    {
+        FoodAdd.CategoryId = GetCategoryByName(e.Value.ToString()).CategoryId;
+    }
+
+    private string GetCategoryName(Guid categoryId)
+    {
+        return _listCategory.FirstOrDefault(p => p.CategoryId == categoryId).Name;
+    }
+
+    private CategoryVM GetCategoryByName(string name)
+    {
+        return _listCategory.FirstOrDefault(p => p.Name == name);
+    }
+
+    private async Task GetCurrentFood(FoodVM food)
+    {
+        _listCategory = await _categoryRepos.GetAll();
+        _currentFood = food;
+        _currentFoodName = food.Name;
+        _currentFoodPrice = food.Price.ToString();
+        _currentCategory = await _categoryRepos.GetById(food.CategoryId);
+        _currentCategoryName = _currentCategory.Name;
+    }
+
+    private async Task UpdateFood()
+    {
+        if (_currentFood == null)
+        {
+            messages.Add(CreateToastChooseFood(ToastType.Warning));
+            return;
+        }
+        if (_currentFoodName == "")
+        {
+            messages.Add(CreateToastChooseFoodName(ToastType.Warning));
+            return;
+        }
+        if (_currentFoodPrice == "" || _currentFoodPrice == "e")
+        {
+            messages.Add(CreateToastChooseFoodPrice(ToastType.Warning));
+            return;
+        }
+        await _foodRepos.Update(_currentFood.FoodId, new FoodVM()
+            {
+                Name = _currentFoodName,
+                CategoryId = _currentCategory.CategoryId,
+                Price = double.Parse(_currentFoodPrice),
+                Status = FoodStatus.Serve
+            });
+        messages.Add(CreateToastUpdateSuccess(ToastType.Success));
+        _listFood = await _foodRepos.GetAll();
+        _currentCategory = null;
+        _currentCategoryName = "";
+        _currentFood = null;
+        _currentFoodName = "";
+        _currentFoodPrice = "";
+    }
+
+    private async Task DeleteFood()
+    {
+        if (_currentFood == null)
+        {
+            messages.Add(CreateToastChooseFood(ToastType.Warning));
+        }
+        else
+        {
+            await _foodRepos.Delete(_currentFood.FoodId);
+            messages.Add(CreateToastDeleteSuccess(ToastType.Success));
+            _listFood = await _foodRepos.GetAll();
+            _currentCategory = null;
+            _currentCategoryName = "";
+            _currentFood = null;
+            _currentFoodName = "";
+            _currentFoodPrice = "";
+        }
+    }
+
+    private async Task AddFood()
+    {
+        if (FoodAdd.Name != null && FoodAdd.Price == 0 && FoodAdd.CategoryId != Guid.Empty)
+        {
+            await _foodRepos.Add(FoodAdd);
+            messages.Add(CreateToastAddSuccess(ToastType.Success));
+            _listFood = await _foodRepos.GetAll();
+            FoodAdd = new FoodVM()
+                {
+                    Name = ""
+                };
+        }
+        else
+        {
+            messages.Add(CreateToastFillInfo(ToastType.Warning));
+        }
+    }
+
+    private async Task SearchFood(ChangeEventArgs e)
+    {
+        if (e.Value.ToString()!="")
+        {
+            Console.WriteLine(e.Value.ToString());
+            _listFood = await _foodRepos.Search(e.Value.ToString());
+            _currentCategory = null;
+            _currentCategoryName = "";
+            _currentFood = null;
+            _currentFoodName = "";
+            _currentFoodPrice = "";
+        }
+        else
+        {
+            _listFood = await _foodRepos.GetAll();
+        }
+    }
+
+    #region Modal
+    private Modal modal;
+
+    private async Task OnShowModalClick()
+    {
+        await modal?.ShowAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        await modal?.HideAsync();
+    }
+    #endregion
+}

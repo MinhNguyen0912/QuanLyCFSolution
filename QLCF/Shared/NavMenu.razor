@@ -1,0 +1,66 @@
+﻿@using Blazored.SessionStorage;
+@using Microsoft.AspNetCore.Authorization;
+@using Microsoft.AspNetCore.Components.Authorization
+@using QLCF.Repositories.Interfaces;
+@using QLCF.Repositories;
+@using QuanLyCF.DAL.Entities;
+@inject BlazorSchoolAuthenticationStateProvider BlazorSchoolAuthenticationStateProvider
+
+
+
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">My Coffee House</a>
+        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+</div>
+
+<div class="@NavMenuCssClass" @onclick="ToggleNavMenu">
+    <nav class="flex-column">
+        <AuthorizeView Roles="admin,staff">
+            <NotAuthorized>
+                <div class="nav-item px-3">
+                    <NavLink style="padding-left:12px;" class="nav-link" href="/login">
+                        <span class="oi oi-person" aria-hidden="true"></span> Login
+                    </NavLink>
+                </div>
+            </NotAuthorized>
+            <Authorized>
+                <div class="nav-item px-3">
+                    <NavLink style="padding-left:12px;" class="nav-link" href="/home">
+                        <span class="oi oi-plus" aria-hidden="true"></span> Home
+                    </NavLink>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+        <AuthorizeView Roles="admin">
+            <Authorized>
+                <div class="nav-item px-3">
+                    <NavLink style="padding-left:12px;" class="nav-link" href="/statistics">
+                        <span class="oi oi-plus" aria-hidden="true"></span> Thống kê chung
+                    </NavLink>
+                </div>
+                <div class="nav-item px-3">
+                    <NavLink style="padding-left:12px;" class="nav-link" href="/food">
+                        <span class="oi oi-plus" aria-hidden="true"></span> Thức ăn
+                    </NavLink>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+    </nav>
+</div>
+
+@code {
+    private bool collapseNavMenu = true;
+    private int _isShow = 0;
+
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+}

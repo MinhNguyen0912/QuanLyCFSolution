@@ -1,0 +1,213 @@
+﻿@page "/statistics"
+@using BlazorBootstrap.Extensions
+@using Color = System.Drawing.Color
+@using Microsoft.AspNetCore.Authorization;
+@using QLCF.Repositories.Interfaces;
+@using QuanLyCF.BLL.ViewModels.Bill;
+@attribute [Authorize(Roles = "admin")]
+
+<div class="fadeInDown">
+    <div style="display:flex">
+        <BarChart Style="box-shadow:0 0 30px black; border-radius:8px;ju" @ref="barChart" Width="870" Class="mb-4" />
+        <div style="display:flex;flex-direction:column;align-items:center">
+            <div style="margin-bottom:8px" class="button wood" @onclick="async () => await ChangeChartMode(0)">
+                <div>Thống kê theo tuần</div>
+            </div>
+            <div class="button wood" @onclick="async () => await ChangeChartMode(1)">
+                <div>Thống kê theo tháng</div>
+            </div>
+        </div>
+    </div>
+    @if (barChart!=null)
+{
+    <div class="button wood" @onclick="async () => await ShowVerticalBarChartAsync()">
+        <div>Biểu đồ dọc</div>
+    </div>
+    <div class="button wood" @onclick="async () => await ShowHorizontalBarChartAsync()">
+        <div>Biểu đồ ngang</div>
+    </div>
+    
+}
+</div>
+@code {
+    [Inject]
+    private IBillRepos _billRepos { get; set; }
+
+
+    private BarChart barChart;
+    private ChartData chartData;
+    private BarChartOptions chartOptions;
+    private int ContentChart = 0;//0: tuan; 1: nam
+
+    Random random = new Random();
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (ContentChart==0)
+        {
+            chartData = new ChartData
+                {
+                    Labels = new List<string> { "Monday", "Tuesday", "Wednesday", "Thursday ", "Friday", "Saturday", "Sunday"},
+                    Datasets = new List<IChartDataset>()
+                };
+        }
+        else
+        {
+            chartData = new ChartData
+                {
+                    Labels = new List<string> { "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" },
+                    Datasets = new List<IChartDataset>()
+                };
+
+        }
+
+        chartData.Datasets.Add(await GetRandomBarChartDataset(0));
+        chartData.Datasets.Add(await GetRandomBarChartDataset(1));
+        chartData.Datasets.Add(await GetRandomBarChartDataset(2));
+
+        chartOptions = new BarChartOptions
+            {
+                Responsive = true,
+                Interaction = new Interaction { Mode = InteractionMode.Index }
+            };
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await barChart.InitializeAsync(chartData, chartOptions);
+        }
+        await base.OnAfterRenderAsync(firstRender);
+        await barChart.UpdateAsync(chartData, chartOptions);
+
+    }
+
+    private async Task ChangeChartMode(int i)
+    {
+        ContentChart = i;
+        await OnInitializedAsync();
+        await barChart.UpdateAsync(chartData, chartOptions);
+
+    }
+
+    private async Task ShowHorizontalBarChartAsync()
+    {
+        chartOptions.IndexAxis = "y";
+        await barChart.UpdateAsync(chartData, chartOptions); 
+    }
+
+    private async Task ShowVerticalBarChartAsync()
+    {
+
+        chartOptions.IndexAxis = "x";
+        await barChart.UpdateAsync(chartData, chartOptions);
+    }
+
+    private async Task<BarChartDataset> GetRandomBarChartDataset(int number)
+    {
+        if (ContentChart==0)
+        {
+            #region Week
+            var c = Color.FromArgb(random.Next(256), random.Next(256), random.Next(256));
+            if (number == 0)
+            {
+                // random color
+                var data = new List<double>();
+
+                for (int i = 0; i < 7; i++)
+                {
+                    double totalPrice = 0;
+                    var currentStartTime = DateTime.Now.Date.AddDays(-1 * (Int32)DateTime.Now.DayOfWeek+i+1);
+                    var currentEndTime = currentStartTime.AddDays(1);
+                    var bills = await _billRepos.GetAllInRangeTime(currentStartTime.ToString("yyyy-MM-dd"), currentEndTime.ToString("yyyy-MM-dd"));
+                    if (bills.Count == 0)
+                    {
+                        data.Add(0);
+                        continue;
+
+                    }
+                    foreach (var bill in bills)
+                    {
+                        totalPrice += await _billRepos.GetTotalPrice(bill.IdBill);
+                    }
+                    data.Add(totalPrice / 1000);
+
+                }
+                return new BarChartDataset()
+                    {
+                        Label = chartData.Datasets.Count == 0 ? "Doanh thu" : (chartData.Datasets.Count == 1 ? "Chi phí" : "Lợi nhuận"),
+                        Data = data,
+                        BackgroundColor = new List<string> { c.ToRgbString() },
+                        BorderColor = new List<string> { c.ToRgbString() },
+                        BorderWidth = new List<double> { 0 },
+                    };
+            }
+            else
+            {
+                return new BarChartDataset()
+                    {
+                        Label = chartData.Datasets.Count == 0 ? "Doanh thu" : (chartData.Datasets.Count == 1 ? "Chi phí" : "Lợi nhuận"),
+                        Data = new List<double> { random.Next(1000), random.Next(1000), random.Next(1000), random.Next(1000), random.Next(1000), random.Next(1000), random.Next(1000)},
+                        BackgroundColor = new List<string> { c.ToRgbString() },
+                        BorderColor = new List<string> { c.ToRgbString() },
+                        BorderWidth = new List<double> { 0 },
+                    };
+            }
+            #endregion
+        }
+        else
+        {
+            #region Year
+            var c = Color.FromArgb(random.Next(256), random.Next(256), random.Next(256));
+            if (number == 0)
+            {
+                // random color
+                var data = new List<double>();
+
+                for (int i = 1; i < 13; i++)
+                {
+                    double totalPrice = 0;
+                    DateTime currentStartTime = new DateTime(DateTime.Now.Year, i, 1);
+                    DateTime currentEndTime = new DateTime(DateTime.Now.Year, i, DateTime.DaysInMonth(DateTime.Now.Year, i)).AddDays(1);
+                    var bills = await _billRepos.GetAllInRangeTime(currentStartTime.ToString("yyyy-MM-dd"), currentEndTime.ToString("yyyy-MM-dd"));
+                    if (bills.Count == 0)
+                    {
+                        data.Add(0);
+                        continue;
+
+                    }
+                    foreach (var bill in bills)
+                    {
+                        totalPrice += await _billRepos.GetTotalPrice(bill.IdBill);
+                    }
+                    data.Add(totalPrice / 1000);
+
+
+                }
+                return new BarChartDataset()
+                    {
+                        Label = chartData.Datasets.Count == 0 ? "Doanh thu" : (chartData.Datasets.Count == 1 ? "Chi phí" : "Lợi nhuận"),
+                        //Data = new List<double> { random.Next(120), random.Next(120), random.Next(120), random.Next(120), random.Next(120), random.Next(120), random.Next(120), random.Next(120), random.Next(120), random.Next(120), random.Next(120), random.Next(120) },
+                        Data = data,
+                        BackgroundColor = new List<string> { c.ToRgbString() },
+                        BorderColor = new List<string> { c.ToRgbString() },
+                        BorderWidth = new List<double> { 0 },
+                    };
+            }
+            else
+            {
+                return new BarChartDataset()
+                    {
+                        Label = chartData.Datasets.Count == 0 ? "Doanh thu" : (chartData.Datasets.Count == 1 ? "Chi phí" : "Lợi nhuận"),
+                        Data = new List<double> { random.Next(1000), random.Next(1000), random.Next(1000), random.Next(1000), random.Next(1000), random.Next(1000), random.Next(1000), random.Next(1000), random.Next(1000), random.Next(1000), random.Next(1000), random.Next(1000) },
+                        BackgroundColor = new List<string> { c.ToRgbString() },
+                        BorderColor = new List<string> { c.ToRgbString() },
+                        BorderWidth = new List<double> { 0 },
+                    };
+            }
+            #endregion  
+        }
+    }
+}

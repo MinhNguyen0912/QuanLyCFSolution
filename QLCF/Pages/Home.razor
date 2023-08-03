@@ -1,0 +1,549 @@
+﻿@page "/home"
+@using BlazorBootstrap
+@using Blazored.SessionStorage;
+@using GemBox.Spreadsheet;
+@using QLCF.Repositories.Interfaces;
+@using QLCF.Repositories;
+@using QuanLyCF.BLL.ViewModels.Bill;
+@using QuanLyCF.BLL.ViewModels.BillInfo;
+@using QuanLyCF.BLL.ViewModels.Category;
+@using QuanLyCF.BLL.ViewModels.Food;
+@using QuanLyCF.BLL.ViewModels.Table;
+@using QuanLyCF.DAL.Entities;
+@using QuanLyCF.DAL.Enums;
+@using System.Data;
+@inject Microsoft.JSInterop.IJSRuntime JS
+
+
+
+@if (_listTable != null && _listCategory != null)
+{
+    <div class="box fadeInDown">
+        <div style="width: 50%;overflow-y: scroll;" class="table_box container text-center">
+            <div style="margin: 0 10px;" class="row">
+                <div style="display: flex;" class="col">
+                    <div style="width: 16px; height: 16px; margin-right: 4px;" class="available"></div>
+                    <span style="font-size: 14px;">Còn trống</span>
+                </div>
+                <div style="display: flex;" class="col">
+                    <div style="width: 16px; height: 16px; margin-right: 4px;" class="notServe"></div>
+                    <span style="font-size: 14px;">Tạm đóng</span>
+                </div>
+                <div style="display: flex;" class="col">
+                    <div style="width: 16px; height: 16px; margin-right: 4px;" class="pending"></div>
+                    <span style="font-size: 14px;">Đặt trước</span>
+                </div>
+                <div style="display: flex;" class="col">
+                    <div style="width: 16px; height: 16px; margin-right: 4px;" class="serving"></div>
+                    <span style="font-size: 14px;">Có khách</span>
+                </div>
+            </div>
+            <hr>
+
+            @for (int i = 0; i < _rowCount; i++)
+            {
+                <div class="row_btn row">
+                    @foreach (var item in _listTable.Select((value, index) => (value, index)))
+                    {
+                        if (item.index / 4 == i)
+                        {
+                            if (_currentTable != null && _listTable.FindIndex(0, p => p.IdTable == _currentTable.IdTable) == item.index)
+                            {
+                                <div style="border:2px solid red" @onclick="async (e)=>await ShowBill(item.value.IdTable, e)" class="button_box @GetStatus(_listTable,item.index)">@item.value.Name</div>
+                            }
+                            else
+                            {
+
+                                <div @onclick="async (e)=>await ShowBill(item.value.IdTable, e)" class="button_box @GetStatus(_listTable,item.index)">@item.value.Name</div>
+                            }
+                        }
+                    }
+                </div>
+            }
+
+            <div class="row_btn row">
+                @foreach (var item in _listTable.Select((value, index) => (value, index)))
+                {
+                    if (item.index / 4 == _rowCount)
+                    {
+                        if (_currentTable != null && _listTable.FindIndex(0, p => p.IdTable == _currentTable.IdTable) == item.index)
+                        {
+                            <div style="border:2px solid red" @onclick="async (e)=>await ShowBill(item.value.IdTable, e)" class="button_box @GetStatus(_listTable,item.index)">@item.value.Name</div>
+                        }
+                        else
+                        {
+
+                            <div @onclick="async (e)=>await ShowBill(item.value.IdTable, e)" class="button_box @GetStatus(_listTable,item.index)">@item.value.Name</div>
+                        }
+                    }
+                }
+            </div>
+        </div>
+        <div style="width: 50%;">
+            <div class="box_top">
+                <div class="box_top_left">
+                    <div style="margin-bottom: 4px;" class="dropdown">
+                        <button style="color: rgba(0,0,0,1);" class="button wood2 item_btn btn btn-secondary dropdown-toggle btn-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            @(_currentCategory == null ? "Chọn danh mục" : _currentCategory.Name)
+                        </button>
+                        <ul style="max-height:114px;overflow:scroll;" class="dropdown-menu">
+                            @foreach (var item in _listCategory)
+                            {
+                                <li @onclick="async ()=>await GetCategory(item)" class="dropdown-item">@item.Name</li>
+                            }
+                        </ul>
+                    </div>
+                    <div class="dropdown">
+                        <button style="color: rgba(0,0,0,1);" class="button wood2 item_btn btn btn-secondary dropdown-toggle btn-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            @(_currentFood == null ? "Chọn món ăn" : _currentFood.Name)
+                        </button>
+
+                        <ul class="dropdown-menu">
+                            @if (_listFood != null)
+                            {
+                                @foreach (var item in _listFood)
+                                {
+                                    <li @onclick="()=>GetFood(item)" class="dropdown-item">@item.Name</li>
+                                }
+                            }
+                        </ul>
+                    </div>
+                </div>
+                <div class="box_top_middle">
+                    <div class="button wood">
+                        <div @onclick="async ()=>await AddToBill()">Thêm món</div>
+                    </div>
+                </div>
+                <div class="box_top_right">
+                    Số lượng
+                    <input @bind-value="count" style="width: 80px;" type="number" />
+                </div>
+            </div>
+            <div style="position:relative;overflow:scroll" class="box_middle">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th scope="col">STT</th>
+                            <th scope="col">Tên món</th>
+                            <th scope="col">Đơn giá</th>
+                            <th scope="col">Số lượng</th>
+                            <th scope="col">Thành tiền</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (_listBillInfo != null)
+                        {
+                            @foreach (var item in _listBillInfo)
+                            {
+                                <tr>
+                                    <th scope="row">@(_listBillInfo.IndexOf(item) + 1)</th>
+                                    <td>@item.FoodName</td>
+                                    <td>@RenderPrice(item.Price)</td>
+                                    <td>@item.Count</td>
+                                    <td>@RenderPrice(item.Price*item.Count)</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+                <textarea @bind="note" @oninput="async (value)=>await SaveNote(value)" style="position:sticky;bottom:0;left:0;right:0;width:100%" class="note" name="" id="" rows="2"></textarea>
+
+            </div>
+            <div class="box_bottom">
+                <div>
+                    <div class="button wood">
+                        <div>Hình thức</div>
+                    </div>
+                    <div class="dropdown">
+                        <button style="color: rgba(0,0,0,1); width: 112px;" class="button wood2 item_btn btn btn-secondary dropdown-toggle btn-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            @(_currentPayBy == -1 ? "Lựa chọn" : (_currentPayBy == 0 ? "Tiền mặt" : "Chuyển khoản"))
+                        </button>
+
+                        <ul style="max-height:114px;overflow:scroll;" class="dropdown-menu">
+                            <li @onclick="()=>GetPayBy(0)" class="dropdown-item">Tiền mặt</li>
+                            <li @onclick="()=>GetPayBy(1)" class="dropdown-item">Chuyển khoản</li>
+
+                        </ul>
+                    </div>
+                </div>
+                <div>
+                    <div @onclick="()=>ShowPriceDiscount()" class="button wood">
+                        <div>Giảm giá</div>
+                    </div>
+                    <input @bind="_currentDiscount" style="width: 100px; display: block;" type="number" />
+                </div>
+                <div>
+                    <textarea style="text-align:center;padding:30px 0;font-weight:900;" readonly name="" id="" cols="10" @bind="_currentPrice" rows="1"></textarea>
+                </div>
+                <div>
+                    <button class="pay_btn" @onclick="async ()=>await Pay()">
+                        <p>Thanh toán</p>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <Toasts class="p-3" Messages="messages" AutoHide="true" Delay="2000" Placement="ToastsPlacement.TopLeft" />
+
+}
+
+
+@code {
+    [Inject]
+    private ITableRepos _tableRepos { get; set; }
+    [Inject]
+    private IBillInfoRepos _billInfoRepos { get; set; }
+    [Inject]
+    private IBillRepos _billRepos { get; set; }
+    [Inject]
+    private ICategoryRepos _categoryRepos { get; set; }
+    [Inject]
+    private IFoodRepos _foodRepos { get; set; }
+    [Inject]
+    private IUserRepos _userRepos { get; set; }
+    [Inject]
+    ISessionStorageService _session { get; set; }
+
+    List<TableVM> _listTable;
+    List<CategoryVM> _listCategory;
+    List<FoodVM> _listFood;
+    List<BillInfoVM> _listBillInfo;
+    BillVM _currentBill;
+    TableVM _currentTable;
+    int _currentPayBy = -1;
+    CategoryVM _currentCategory;
+    FoodVM _currentFood;
+
+    int _rowCount = 0;
+    int _lastRowCount = 0;
+    string count = "1";
+    string note = "";
+    string _currentPrice = "";
+    string _currentDiscount = "";
+    #region Toast options
+    //Toast options--------------------------------
+    List<ToastMessage> messages = new List<ToastMessage>();
+
+    private ToastMessage CreateToastChooseFood(ToastType toastType)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Lưu ý",
+            HelpText = $"{DateTime.Now}",
+            Message = $"Vui lòng chọn món ăn",
+        };
+
+    private ToastMessage CreateToastChooseTable(ToastType toastType)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Lưu ý",
+            HelpText = $"{DateTime.Now}",
+            Message = $"Vui lòng chọn bàn hiện tại",
+        };
+    private ToastMessage CreateToastChoosePayBy(ToastType toastType)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Lưu ý",
+            HelpText = $"{DateTime.Now}",
+            Message = $"Vui lòng chọn phương thức thanh toán",
+        };
+    private ToastMessage CreateToastPaySuccess(ToastType toastType)
+    => new ToastMessage
+    {
+        Type = toastType,
+        Title = "Thông báo",
+        HelpText = $"{DateTime.Now}",
+        Message = $"Thanh toán thành công",
+    };
+    //-----------------------------------------------
+    #endregion
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _listTable = await _tableRepos.GetAll();
+        _rowCount = _listTable.Count / 4;
+        _lastRowCount = _listTable.Count % 4;
+        _listCategory = await _categoryRepos.GetAll();
+    }
+
+    private string GetStatus(List<TableVM> lst, int i)
+    {
+        if (lst[i].Status == TableStatus.NotServe)
+        {
+            return "notServe";
+        }
+        else if (lst[i].Status == TableStatus.Available)
+        {
+            return "available";
+        }
+        else if (lst[i].Status == TableStatus.Booked)
+        {
+            return "pending";
+        }
+        else
+        {
+            return "serving";
+        }
+    }
+
+    private async Task ShowBill(Guid IdTable, MouseEventArgs e)
+    {
+
+        var table = await _tableRepos.GetById(IdTable);
+        if (table.Status == TableStatus.Serving)
+        {
+            double result = 0;
+            _currentBill = await _billRepos.GetByTableId(IdTable);
+            _listBillInfo = await _billInfoRepos.GetAllByIdBill(_currentBill.IdBill);
+            _currentTable = table;
+            foreach (var item in _listBillInfo)
+            {
+                result += item.Count * item.Price;
+            }
+            _currentPrice = RenderPrice(result);
+
+        }
+        else if (table.Status == TableStatus.Available)
+        {
+            _currentTable = table;
+            _currentBill = null;
+            _listBillInfo = null;
+            _currentPrice = "";
+
+
+        }
+        else
+        {
+            _currentTable = null;
+            _currentBill = null;
+            _listBillInfo = null;
+            _currentPrice = "";
+        }
+        _currentPayBy = -1;
+        _currentDiscount = "";
+        note = _currentBill == null ? "" : _currentBill.Note;
+    }
+
+    private async Task SaveNote(ChangeEventArgs args)
+    {
+        if (_currentBill != null)
+        {
+            await _billRepos.UpdateNote(_currentBill.IdBill, args.Value.ToString());
+        }
+    }
+
+    private string RenderPrice(double price)
+    {
+        var count = 1;
+        var result = "";
+        var firstPrice = price.ToString();
+        for (int i = firstPrice.Length - 1; i >= 0; i--)
+        {
+            result += firstPrice[i];
+            if (count % 3 == 0 && i != 0)
+            {
+                result += ".";
+            }
+            count++;
+        }
+        char[] stringArray = result.ToCharArray();
+        Array.Reverse(stringArray);
+        string reversedStr = new string(stringArray);
+        return reversedStr;
+    }
+
+    private async Task GetCategory(CategoryVM category)
+    {
+        _currentCategory = category;
+        _currentFood = null;
+        _listFood = await _foodRepos.GetByCategoryId(category.CategoryId);
+    }
+
+    private void GetFood(FoodVM food)
+    {
+        _currentFood = food;
+    }
+
+    private async Task AddToBill()
+    {
+        var token = await _session.GetItemAsStringAsync("authToken");
+        var claims = await _userRepos.ValidateToken(token);
+        var userName = claims["Name"];
+        var user = await _userRepos.GetUserByUserName(userName.ToString());
+        int number;
+        if (_currentFood == null)
+        {
+            messages.Add(CreateToastChooseFood(ToastType.Warning));
+            return;
+        }
+        if (_currentTable == null)
+        {
+            messages.Add(CreateToastChooseTable(ToastType.Warning));
+            return;
+        }
+        if (_currentBill == null)
+        {
+            var billRequest = new AddBillVM()
+                {
+                    IdTable = _currentTable.IdTable,
+                    CreateBy = user.Id,
+                    Note = ""
+                };
+            var billId = await _billRepos.Add(billRequest);
+            _currentBill = await _billRepos.GetById(billId);
+            var tableVM = new TableVM()
+                {
+                    IdTable = _currentTable.IdTable,
+                    Name = _currentTable.Name,
+                    Status = TableStatus.Serving
+                };
+            await _tableRepos.Update(_currentTable.IdTable, tableVM);
+            _listTable = await _tableRepos.GetAll();
+
+
+        }
+        await _billRepos.AddFood(_currentBill.IdBill, _currentFood.FoodId, int.TryParse(count, out number) ? number : 1);
+
+        _listBillInfo = await _billInfoRepos.GetAllByIdBill(_currentBill.IdBill);
+
+        double result = 0;
+        foreach (var item in _listBillInfo)
+        {
+            result += item.Count * item.Price;
+        }
+        _currentPrice = RenderPrice(result);
+
+
+
+    }
+
+    private void GetPayBy(int type)
+    {
+        _currentPayBy = type;
+    }
+
+    private void ShowPriceDiscount()
+    {
+        if (_currentDiscount != "" && _currentDiscount != "e" && _listBillInfo != null)
+        {
+            double result = 0;
+            foreach (var item in _listBillInfo)
+            {
+                result += item.Count * item.Price;
+            }
+            result *= ((100 - int.Parse(_currentDiscount)) / (double)(100));
+            _currentPrice = RenderPrice(result);
+        }
+    }
+
+    private async Task Pay()
+    {
+        if (_currentBill == null)
+        {
+            messages.Add(CreateToastChooseTable(ToastType.Warning));
+        }
+        else if (_currentPayBy == -1)
+        {
+            messages.Add(CreateToastChoosePayBy(ToastType.Warning));
+        }
+        else
+        {
+            var token = await _session.GetItemAsStringAsync("authToken");
+            var claims = await _userRepos.ValidateToken(token);
+            var userName = claims["Name"];
+            var user = await _userRepos.GetUserByUserName(userName.ToString());
+            await _billRepos.Pay(_currentBill.IdBill, user.Id, (_currentDiscount != "" && _currentDiscount != "e") ? int.Parse(_currentDiscount) : 0);
+            //_listCategory = await _categoryRepos.GetAll();
+            messages.Add(CreateToastPaySuccess(ToastType.Success));
+            CreateDocument();
+
+            _listTable = await _tableRepos.GetAll();
+            _currentDiscount = "";
+            _currentTable = null;
+            _currentBill = null;
+            _currentPrice = "";
+            _listBillInfo = null;
+            _currentPayBy = -1;
+        }
+    }
+
+    public async void CreateDocument()
+    {
+        var book = new ExcelFile();
+        var sheet = book.Worksheets.Add("Bill");
+        List<BillInfoVM> data = await _billInfoRepos.GetAllByIdBill(_currentBill.IdBill);
+        CellStyle style = sheet.Rows[0].Style;
+        style.Font.Weight = ExcelFont.BoldWeight;
+        style.HorizontalAlignment = HorizontalAlignmentStyle.Center;
+        sheet.Columns[0].Style.HorizontalAlignment = HorizontalAlignmentStyle.Center;
+        sheet.Columns[0].SetWidth(150, LengthUnit.Pixel);
+        sheet.Columns[1].SetWidth(150, LengthUnit.Pixel);
+        sheet.Columns[2].SetWidth(150, LengthUnit.Pixel);
+        sheet.Columns[3].SetWidth(150, LengthUnit.Pixel);
+        sheet.Columns[4].SetWidth(150, LengthUnit.Pixel);
+        sheet.Cells["A1"].Value = "STT";
+        sheet.Cells["B1"].Value = "Tên món";
+        sheet.Cells["C1"].Value = "Số lượng";
+        sheet.Cells["D1"].Value = "Đơn giá";
+        sheet.Cells["E1"].Value = "Thành tiền";
+        for (int r = 1; r <= data.Count; r++)
+        {
+            var item = data[r - 1];
+            sheet.Cells[r, 0].Value = r;
+            sheet.Cells[r, 1].Value = item.FoodName;
+            sheet.Cells[r, 2].Value = item.Count;
+            sheet.Cells[r, 3].Value = item.Price;
+            sheet.Cells[r, 4].Value = item.Price*item.Count;
+        }
+        sheet.Cells[data.Count + 1, 3].Value = "Giảm giá";
+        sheet.Cells[data.Count + 1, 4].Value = (_currentDiscount == "" || _currentDiscount == "e") ?"0 %":(_currentDiscount+" %");
+        sheet.Cells[data.Count + 2, 3].Value = "Tổng tiền";
+        sheet.Cells[data.Count + 2, 4].Value = await _billRepos.GetTotalPrice(_currentBill.IdBill);
+        SaveOptions options = GetSaveOptions("XLSX");
+
+        using (MemoryStream stream = new MemoryStream())
+        {
+            //Save the created Excel document to MemoryStream
+            book.Save(stream, options);
+
+
+            //Download the excel file.
+            await JS.SaveAs("Sample.xlsx", stream.ToArray());
+        }
+    }
+
+    private static SaveOptions GetSaveOptions(string format)
+    {
+        switch (format.ToUpper())
+        {
+            case "XLSX":
+                return SaveOptions.XlsxDefault;
+            case "XLS":
+                return SaveOptions.XlsDefault;
+            case "ODS":
+                return SaveOptions.OdsDefault;
+            case "CSV":
+                return SaveOptions.CsvDefault;
+            case "HTML":
+                return SaveOptions.HtmlDefault;
+            case "PDF":
+                return SaveOptions.PdfDefault;
+            case "XPS":
+            case "PNG":
+            case "JPG":
+            case "GIF":
+            case "TIF":
+            case "BMP":
+            case "WMP":
+                throw new InvalidOperationException("To enable saving to XPS or image format, add 'Microsoft.WindowsDesktop.App' framework reference.");
+            default:
+                throw new NotSupportedException();
+        }
+    }
+}

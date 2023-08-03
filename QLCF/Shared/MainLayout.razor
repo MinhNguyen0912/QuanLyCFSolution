@@ -1,0 +1,42 @@
+﻿@using QLCF.Repositories;
+@inherits LayoutComponentBase
+@inject BlazorSchoolAuthenticationStateProvider BlazorSchoolAuthenticationStateProvider
+
+
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <AuthorizeView Roles="admin,staff">
+            <Authorized>
+                <div class="top-row px-4" style="display:flex">
+                    @*<NavLink style="padding-left:12px;" class="nav-link" href="/statistics">
+                        <span class="oi oi-plus" aria-hidden="true"></span> Thống kê chung
+                    </NavLink>*@
+                    <p style="margin:0 10px 0 0">Tài khoản: @context.User.FindFirst("Role").Value</p>
+                    <p style="margin:0 10px 0 0">Chức vụ: @context.User.FindFirst("Name").Value</p>
+                    <a @onclick="async()=>await BlazorSchoolAuthenticationStateProvider.Logout()" href="/login">Đăng xuất</a>
+                </div>
+            </Authorized>
+            @*<NotAuthorized>
+                <div class="top-row px-4">
+                    <a href="https://docs.microsoft.com/aspnet/" target="_blank">About</a>
+                </div>
+
+            </NotAuthorized>*@
+        </AuthorizeView>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+
+</div>
+
+@code{
+    private BlazorSchoolAuthenticationStateProvider _authService{ get; set; }
+}
+

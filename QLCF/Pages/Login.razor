@@ -1,0 +1,73 @@
+﻿@page "/login"
+@using Blazored.SessionStorage;
+@using QLCF.Repositories.Interfaces;
+@using QLCF.Repositories;
+@using QuanLyCF.BLL.ViewModels;
+@using System.Text.RegularExpressions
+@using System.ComponentModel.DataAnnotations
+@using QLCF.Repositories.Services;
+@using QuanLyCF.BLL.ViewModels.Category;
+@inject NavigationManager NavigationManager;
+@inject BlazorSchoolAuthenticationStateProvider BlazorSchoolAuthenticationStateProvider
+
+    
+    @if (isError)
+    {
+        <div class="alert alert-danger">
+            <p>@Error</p>
+        </div>
+    }
+
+    <div class="wrapper fadeInDown custom_bg">
+        <div id="formContent">
+            <!-- Tabs Titles -->
+            <!-- Icon -->
+            <div class="fadeIn first">
+                <img style="width:50%" src="https://img.freepik.com/free-vector/gradient-cafe-signage-design_23-2149297489.jpg?w=740&t=st=1689661488~exp=1689662088~hmac=f595fbd0389d1ef03f01732669d9864d2da2aa119ca71019812a9de15bd4a98a" id="icon" alt="Đăng nhập" />
+            </div>
+
+            <!-- Login Form -->
+            <EditForm Model="model" style="align-items:center">
+                <DataAnnotationsValidator></DataAnnotationsValidator>
+                <ValidationSummary></ValidationSummary>
+                <input @bind-value="model.UserName" type="text" id="login" class="fadeIn second" name="login" placeholder="Tên người dùng">
+                <ValidationMessage For="()=>model.UserName"></ValidationMessage>
+                <input @bind-value="model.Password" type="text" id="password" class="fadeIn third" name="login" placeholder="Mật khẩu">
+                <ValidationMessage For="()=>model.Password"></ValidationMessage>
+                <input type="button" @onclick="async ()=>await HandleLogin()" class="fadeIn fourth" value="Đăng nhập">
+            </EditForm>
+
+            <!-- Remind Passowrd -->
+
+        </div>
+    </div>
+
+@code{
+    private bool isError = false;
+    private string Error = "";
+    private AuthenticateRequest model = new AuthenticateRequest();
+    [Inject]
+    private IUserRepos _userRepos { get; set; }
+    [Inject]
+    ISessionStorageService _session { get; set; }
+    //private ICategoryRepos _repos { get; set; }
+    public async Task HandleLogin()
+    {
+        var result = await BlazorSchoolAuthenticationStateProvider.Authenticate(model);
+        if (result.Successfull)
+        {
+            var token = await _session.GetItemAsStringAsync("authToken");
+            var claims = await _userRepos.ValidateToken(token);
+            var userName = claims["Name"];
+            var roleName = _userRepos.GetRole(token);
+            var user = await _userRepos.GetUserByUserName(userName.ToString());
+            NavigationManager.NavigateTo("/home");
+        }
+        else
+        {
+            isError = true;
+            Error = result.Error;
+        }
+
+    }
+}
