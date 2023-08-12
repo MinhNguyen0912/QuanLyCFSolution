@@ -27,11 +27,19 @@ namespace QuanLyCF.API.Controllers
             var obj = await _services.GetById(tableId);
             return Ok(obj);
         }
-
-        [HttpPost]
-        public async Task<IActionResult> Add([FromBody] TableVM request)
+        [HttpGet]
+        [Route("search/{s}")]
+        public async Task<IActionResult> Search([FromRoute] string s)
         {
-            var result = await _services.Add(request);
+            var list = await _services.Search(s);
+            return Ok(list);
+        }
+
+        [HttpGet]
+        [Route("add")]
+        public async Task<IActionResult> Add()
+        {
+            var result = await _services.Add();
             return Ok(result);
         }
         [HttpPut]

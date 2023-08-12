@@ -2,6 +2,8 @@
 using Newtonsoft.Json;
 using QLCF.Repositories.Interfaces;
 using QuanLyCF.BLL.ViewModels;
+using QuanLyCF.BLL.ViewModels.Category;
+using QuanLyCF.BLL.ViewModels.Food;
 using QuanLyCF.DAL.Entities;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -26,7 +28,7 @@ namespace QLCF.Repositories.Services
             var loginResponse = JsonConvert.DeserializeObject<LoginResponse>(content);
             if (!result.IsSuccessStatusCode)
             {
-                return new LoginResponse() { Successfull=false, Error="Sai ten dang nhap hoac mat khau"};
+                return new LoginResponse() { Successfull = false, Error = "Sai ten dang nhap hoac mat khau" };
             }
             await _session.SetItemAsStringAsync("authToken", loginResponse.Token);
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginResponse.Token);
@@ -44,7 +46,12 @@ namespace QLCF.Repositories.Services
         public async Task<bool> Register(RegisterRequest request)
         {
             var result = await _httpClient.PostAsJsonAsync("api/accounts/register", request);
-            return true;
+            if (result.IsSuccessStatusCode)
+            {
+                return true;
+
+            }
+            return false;
         }
         public async Task<IDictionary<string, object>> ValidateToken(string token)
         {
@@ -66,6 +73,24 @@ namespace QLCF.Repositories.Services
             var content = await result.Content.ReadAsStringAsync();
             var user = JsonConvert.DeserializeObject<User>(content);
             return user;
+        }
+        public async Task<List<User>> GetAll()
+        {
+            return await _httpClient.GetFromJsonAsync<List<User>>("api/Accounts/all");
+        }
+        public async Task<List<Role>> GetAllRole()
+        {
+            return await _httpClient.GetFromJsonAsync<List<Role>>("api/Accounts/allrole");
+        }
+        public async Task<bool> Update(string userName, string pw)
+        {
+            var result = await _httpClient.PutAsJsonAsync($"api/Accounts/update/{userName}", pw);
+            return result.IsSuccessStatusCode;
+        }
+        public async Task<List<User>> Search(string s)
+        {
+            return await _httpClient.GetFromJsonAsync<List<User>>($"api/Accounts/search/{s}");
+
         }
     }
 }

@@ -1,0 +1,243 @@
+﻿@page "/category"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization;
+@using QLCF.Repositories.Interfaces;
+@using QRCoder;
+@using QuanLyCF.BLL.ViewModels.Category;
+@using QuanLyCF.BLL.ViewModels.Food;
+@using QuanLyCF.DAL.Enums;
+
+@if (_listCategory != null)
+{
+    <div class="box fadeInDown" style="height: 88vh;">
+        <div style="width: 50%" class="table_box container text-center">
+            <div style="margin: 20px 0 40px 0;display: flex;justify-content: space-between;">
+                <div @onclick="()=>OnShowModalClick()" style="min-width: 120px;" class="button wood">
+                    <div>Thêm danh mục</div>
+                </div>
+                <div @onclick="async()=>await UpdateCategory()" style="min-width: 120px;" class="button wood">
+                    <div>Sửa danh mục</div>
+                </div>
+                <div @onclick="()=>DeleteCategory()" style="min-width: 120px;" class="button wood">
+                    <div>Xóa danh mục</div>
+                </div>
+            </div>
+            <div style="height: 400px;overflow: scroll; box-shadow: 0 0 20px black; border-radius: 8px;">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th scope="col">STT</th>
+                            <th scope="col">Tên danh mục</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in _listCategory.Select((value, index) => (value, index)))
+                        {
+                            if (_currentCategory != null && _listCategory.FindIndex(0, p => p.CategoryId == _currentCategory.CategoryId) == item.index)
+                            {
+                                <tr style="background-color:rgba(0,0,0,0.2)" @onclick="async()=>await GetCurrentCategory(item.value)">
+                                    <th scope="row">@(item.index + 1)</th>
+                                    <td>@item.value.Name</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                <tr @onclick="async()=>await GetCurrentCategory(item.value)">
+                                    <th scope="row">@(item.index + 1)</th>
+                                    <td>@item.value.Name</td>
+                                </tr>
+
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div style="width: 50%;margin-left: 40px;">
+            <div class="search-box" style="margin: 20px 0 50px 0;padding-left: 70px;">
+                <button class="btn-search"><i class="fas fa-search"></i></button>
+                <input @oninput="async(e)=>await SearchCategory(e)" type="text" class="input-search" placeholder="Type to Search...">
+            </div>
+            <div style="margin-top: 20px; display: flex;">
+                <span style="margin-right: 20px;width: 110px;display: block;">Tên danh mục:</span>
+                <input @bind="_currentCategoryName" style="width: 320px;" type="text">
+            </div>
+        </div>
+    </div>
+    <Toasts class="p-3" Messages="messages" AutoHide="true" Delay="2000" Placement="ToastsPlacement.TopLeft" />
+    <Modal @ref="modal" Title="Thêm danh mục mới">
+        <BodyTemplate>
+            <div style="display: flex;">
+                <span style="margin-right: 20px;width: 110px;display: block;">Tên danh mục:</span>
+                <input @bind="_categoryAdd.Name" style="width: 320px;" type="text">
+            </div>
+        </BodyTemplate>
+        <FooterTemplate>
+            <Button Color="ButtonColor.Secondary" @onclick="async()=>await OnHideModalClick()">Close</Button>
+            <Button @onclick="async()=>await AddCategory()" Color="ButtonColor.Primary">Thêm danh mục</Button>
+        </FooterTemplate>
+    </Modal>
+}
+
+@code {
+    [Inject]
+    private ICategoryRepos _categoryRepos { get; set; }
+
+
+    private List<CategoryVM>? _listCategory;
+    private CategoryVM? _currentCategory;
+    private CategoryVM _categoryAdd=new CategoryVM(){Name=""};
+    private string _currentCategoryName = "";
+
+    #region Toast options
+    //Toast options--------------------------------
+    List<ToastMessage> messages = new List<ToastMessage>();
+
+    private ToastMessage CreateToastChooseCategory(ToastType toastType)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Lưu ý",
+            HelpText = $"{DateTime.Now}",
+            Message = $"Vui lòng chọn danh mục",
+        };
+    private ToastMessage CreateToastChooseCategoryName(ToastType toastType)
+        => new ToastMessage
+            {
+                Type = toastType,
+                Title = "Lưu ý",
+                HelpText = $"{DateTime.Now}",
+                Message = $"Tên danh mục không được để trống",
+            };
+    private ToastMessage CreateToastUpdateSuccess(ToastType toastType)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Thông báo",
+            HelpText = $"{DateTime.Now}",
+            Message = $"Cập nhật thành công",
+        };
+    private ToastMessage CreateToastDeleteSuccess(ToastType toastType)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Thông báo",
+            HelpText = $"{DateTime.Now}",
+            Message = $"Xóa thành công",
+        };
+    private ToastMessage CreateToastAddSuccess(ToastType toastType)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Thông báo",
+            HelpText = $"{DateTime.Now}",
+            Message = $"Thêm thành công",
+        };
+    private ToastMessage CreateToastFillInfo(ToastType toastType)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Lưu ý",
+            HelpText = $"{DateTime.Now}",
+            Message = $"Vui lòng nhập đầy đủ thông tin",
+        };
+    //-----------------------------------------------
+    #endregion
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _listCategory = await _categoryRepos.GetAll();
+    }
+
+    private async Task GetCurrentCategory(CategoryVM category)
+    {
+        _currentCategory = await _categoryRepos.GetById(category.CategoryId);
+        _currentCategoryName = _currentCategory.Name;
+    }
+
+    private async Task UpdateCategory()
+    {
+        if (_currentCategory == null)
+        {
+            messages.Add(CreateToastChooseCategory(ToastType.Warning));
+            return;
+        }
+        if (_currentCategoryName == "")
+        {
+            messages.Add(CreateToastChooseCategoryName(ToastType.Warning));
+            return;
+        }
+        await _categoryRepos.Update(_currentCategory.CategoryId, new CategoryVM()
+            {
+                Name = _currentCategoryName
+            });
+        messages.Add(CreateToastUpdateSuccess(ToastType.Success));
+        _listCategory = await _categoryRepos.GetAll();
+        _currentCategory = null;
+        _currentCategoryName = "";
+    }
+
+    private async Task DeleteCategory()
+    {
+        if (_currentCategory == null)
+        {
+            messages.Add(CreateToastChooseCategory(ToastType.Warning));
+        }
+        else
+        {
+            await _categoryRepos.Delete(_currentCategory.CategoryId);
+            messages.Add(CreateToastDeleteSuccess(ToastType.Success));
+            _listCategory = await _categoryRepos.GetAll();
+            _currentCategory = null;
+            _currentCategoryName = "";
+        }
+    }
+
+    private async Task AddCategory()
+    {
+        if (_categoryAdd.Name != "")
+        {
+            await _categoryRepos.Add(_categoryAdd.Name);
+            messages.Add(CreateToastAddSuccess(ToastType.Success));
+            _listCategory = await _categoryRepos.GetAll();
+        }
+        else
+        {
+            messages.Add(CreateToastFillInfo(ToastType.Warning));
+        }
+        _categoryAdd = new() { Name = "" };
+    }
+
+    private async Task SearchCategory(ChangeEventArgs e)
+    {
+        if (e.Value.ToString() != "")
+        {
+            _listCategory = await _categoryRepos.Search(e.Value.ToString());
+            _currentCategory = null;
+            _currentCategoryName = "";
+        }
+        else
+        {
+            _listCategory = await _categoryRepos.GetAll();
+        }
+    }
+
+    #region Modal
+    private Modal modal;
+
+    private async Task OnShowModalClick()
+    {
+        await modal?.ShowAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        await modal?.HideAsync();
+    }
+    #endregion
+}

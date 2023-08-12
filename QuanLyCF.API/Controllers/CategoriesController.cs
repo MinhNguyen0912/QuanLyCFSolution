@@ -27,6 +27,13 @@ namespace QuanLyCF.API.Controllers
             var list = await _services.GetById(categoryId);
             return Ok(list);
         }
+        [HttpGet]
+        [Route("search/{s}")]
+        public async Task<IActionResult> Search([FromRoute] string s)
+        {
+            var list = await _services.Search(s);
+            return Ok(list);
+        }
 
         [HttpPost]
         public async Task<IActionResult> Add([FromBody] string categoryName)

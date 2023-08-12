@@ -10,14 +10,6 @@
 @inject NavigationManager NavigationManager;
 @inject BlazorSchoolAuthenticationStateProvider BlazorSchoolAuthenticationStateProvider
 
-    
-    @if (isError)
-    {
-        <div class="alert alert-danger">
-            <p>@Error</p>
-        </div>
-    }
-
     <div class="wrapper fadeInDown custom_bg">
         <div id="formContent">
             <!-- Tabs Titles -->
@@ -32,7 +24,7 @@
                 <ValidationSummary></ValidationSummary>
                 <input @bind-value="model.UserName" type="text" id="login" class="fadeIn second" name="login" placeholder="Tên người dùng">
                 <ValidationMessage For="()=>model.UserName"></ValidationMessage>
-                <input @bind-value="model.Password" type="text" id="password" class="fadeIn third" name="login" placeholder="Mật khẩu">
+                <input @bind-value="model.Password" type="password" id="password" class="fadeIn third" name="login" placeholder="Mật khẩu">
                 <ValidationMessage For="()=>model.Password"></ValidationMessage>
                 <input type="button" @onclick="async ()=>await HandleLogin()" class="fadeIn fourth" value="Đăng nhập">
             </EditForm>
@@ -41,6 +33,7 @@
 
         </div>
     </div>
+    <Toasts class="p-3" Messages="messages" AutoHide="true" Delay="2000" Placement="ToastsPlacement.TopLeft" />
 
 @code{
     private bool isError = false;
@@ -65,9 +58,19 @@
         }
         else
         {
-            isError = true;
-            Error = result.Error;
+            messages.Add(CreateToastFail(ToastType.Warning));
+
         }
 
     }
+    List<ToastMessage> messages = new List<ToastMessage>();
+
+    private ToastMessage CreateToastFail(ToastType toastType)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Lưu ý",
+            HelpText = $"{DateTime.Now}",
+            Message = $"Sai tên tài khoản hoặc mật khẩu",
+        };
 }

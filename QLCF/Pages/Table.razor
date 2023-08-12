@@ -1,0 +1,292 @@
+﻿@page "/table"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization;
+@using QLCF.Repositories.Interfaces;
+@using QRCoder;
+@using QuanLyCF.BLL.ViewModels.Category;
+@using QuanLyCF.BLL.ViewModels.Food;
+@using QuanLyCF.BLL.ViewModels.Table;
+@using QuanLyCF.DAL.Enums;
+
+@if (_listTable != null)
+{
+    <div class="box fadeInDown" style="height: 88vh;">
+        <div style="width: 50%" class="table_box container text-center">
+            <div style="margin: 20px 0 40px 0;display: flex;justify-content: space-between;">
+                <div @onclick="()=>OnShowModalClick()" style="min-width: 120px;" class="button wood">
+                    <div>Thêm bàn</div>
+                </div>
+                <div @onclick="async()=>await UpdateTable()" style="min-width: 120px;" class="button wood">
+                    <div>Sửa bàn</div>
+                </div>
+            </div>
+            <div style="height: 400px;overflow: scroll; box-shadow: 0 0 20px black; border-radius: 8px;">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th scope="col">STT</th>
+                            <th scope="col">Tên bàn</th>
+                            <th scope="col">Trạng thái</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in _listTable.Select((value, index) => (value, index)))
+                        {
+                            if (_currentTable != null && _listTable.FindIndex(0, p => p.IdTable == _currentTable.IdTable) == item.index)
+                            {
+                                <tr style="background-color:rgba(0,0,0,0.2)" @onclick="async()=>await GetCurrentTable(item.value)">
+                                    <th scope="row">@(item.index + 1)</th>
+                                    <td>@item.value.Name</td>
+                                    <td>@GetTableStatusName(item.value.Status)</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                <tr @onclick="async()=>await GetCurrentTable(item.value)">
+                                    <th scope="row">@(item.index + 1)</th>
+                                    <td>@item.value.Name</td>
+                                    <td>@GetTableStatusName(item.value.Status)</td>
+                                </tr>
+
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div style="width: 50%;margin-left: 40px;">
+            <div class="search-box" style="margin: 20px 0 50px 0;padding-left: 70px;">
+                <button class="btn-search"><i class="fas fa-search"></i></button>
+                <input @oninput="async(e)=>await SearchTable(e)" type="text" class="input-search" placeholder="Type to Search...">
+            </div>
+            <div style="margin-top: 20px; display: flex;">
+                <span style="margin-right: 20px;width: 100px;display: block;">Tên bàn:</span>
+                <input readonly @bind="_currentTableName" style="width: 320px;" type="text">
+            </div>
+            <div style="margin-top: 20px; display: flex;">
+                <span style="margin-right: 20px;width: 100px;display: block;">Trạng thái:</span>
+                <select @onchange="(value)=>GetTableStatus(value)" value="@_currentTableStatus" required style="width: 320px;" name="" id="">
+                    <option disabled selected hidden value="-1"></option>
+                    <option value="0">Tạm đóng</option>
+                    <option value="1">Còn trống</option>
+                    <option value="2">Đặt trước</option>
+                    <option value="3">Có khách</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    <Toasts class="p-3" Messages="messages" AutoHide="true" Delay="2000" Placement="ToastsPlacement.TopLeft" />
+    <Modal @ref="modal" Title="Thêm bàn mới">
+        <BodyTemplate>
+            Xác nhận thêm bàn mới?
+        </BodyTemplate>
+        <FooterTemplate>
+            <Button Color="ButtonColor.Secondary" @onclick="async()=>await OnHideModalClick()">Close</Button>
+            <Button @onclick="async()=>await AddTable()" Color="ButtonColor.Primary">Thêm bàn</Button>
+        </FooterTemplate>
+    </Modal>
+}
+
+@code {
+    [Inject]
+    private ITableRepos _tableRepos { get; set; }
+
+
+    private List<TableVM>? _listTable;
+    private TableVM? _currentTable;
+
+    private string _currentTableName = "";
+    private int _currentTableStatus = -1;
+
+    #region Toast options
+    //Toast options--------------------------------
+    List<ToastMessage> messages = new List<ToastMessage>();
+
+    private ToastMessage CreateToastChooseTable(ToastType toastType)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Lưu ý",
+            HelpText = $"{DateTime.Now}",
+            Message = $"Vui lòng chọn bàn",
+        };
+    private ToastMessage CreateToastChooseTableStatus(ToastType toastType)
+    => new ToastMessage
+    {
+        Type = toastType,
+        Title = "Lưu ý",
+        HelpText = $"{DateTime.Now}",
+        Message = $"Vui lòng chọn trạng thái bàn",
+    };
+    private ToastMessage CreateToastChooseTableName(ToastType toastType)
+        => new ToastMessage
+            {
+                Type = toastType,
+                Title = "Lưu ý",
+                HelpText = $"{DateTime.Now}",
+                Message = $"Tên bàn không được để trống",
+            };
+    private ToastMessage CreateToastUpdateSuccess(ToastType toastType)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Thông báo",
+            HelpText = $"{DateTime.Now}",
+            Message = $"Cập nhật thành công",
+        };
+    private ToastMessage CreateToastDeleteSuccess(ToastType toastType)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Thông báo",
+            HelpText = $"{DateTime.Now}",
+            Message = $"Xóa thành công",
+        };
+    private ToastMessage CreateToastAddSuccess(ToastType toastType)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Thông báo",
+            HelpText = $"{DateTime.Now}",
+            Message = $"Thêm thành công",
+        };
+    private ToastMessage CreateToastFillInfo(ToastType toastType)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Lưu ý",
+            HelpText = $"{DateTime.Now}",
+            Message = $"Vui lòng nhập đầy đủ thông tin",
+        };
+    //-----------------------------------------------
+    #endregion
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _listTable = await _tableRepos.GetAll();
+    }
+
+    private async Task GetCurrentTable(TableVM table)
+    {
+        _currentTable = await _tableRepos.GetById(table.IdTable);
+        _currentTableName = _currentTable.Name;
+        if (table.Status == TableStatus.Available)
+        {
+            _currentTableStatus = 1;
+        }
+        else if (table.Status == TableStatus.Serving)
+        {
+            _currentTableStatus = 3;
+        }
+        else if (table.Status == TableStatus.NotServe)
+        {
+            _currentTableStatus = 0;
+        }
+        else
+        {
+            _currentTableStatus = 2;
+        }
+    }
+    private void GetTableStatus(ChangeEventArgs e)
+    {
+        _currentTableStatus = int.Parse(e.Value.ToString());
+    }
+    private string GetTableStatusName(TableStatus status)
+    {
+        string s;
+        if (status == TableStatus.NotServe)
+        {
+            s = "Tạm đóng";
+        }
+        else if (status == TableStatus.Serving)
+        {
+            s = "Có khách";
+        }
+        else if (status == TableStatus.Booked)
+        {
+            s = "Đặt trước";
+        }
+        else
+        {
+            s = "Còn trống";
+        }
+        return s;
+    }
+    private async Task UpdateTable()
+    {
+        if (_currentTable == null)
+        {
+            messages.Add(CreateToastChooseTable(ToastType.Warning));
+            return;
+        }
+        TableStatus status;
+        if (_currentTableStatus == 0)
+        {
+            status = TableStatus.NotServe;
+        }else if(_currentTableStatus == 1)
+        {
+            status = TableStatus.Available;
+        }
+        else if (_currentTableStatus == 2)
+        {
+            status = TableStatus.Booked;
+        }
+        else
+        {
+            status = TableStatus.Serving;
+        }
+        Console.WriteLine(status);
+        await _tableRepos.Update(_currentTable.IdTable, new TableVM()
+            {
+                Name = "",
+                Status = status
+            });
+        messages.Add(CreateToastUpdateSuccess(ToastType.Success));
+        _listTable = await _tableRepos.GetAll();
+        _currentTable = null;
+        _currentTableName = "";
+        _currentTableStatus = -1;
+    }
+
+    private async Task AddTable()
+    {
+            await _tableRepos.Add();
+            messages.Add(CreateToastAddSuccess(ToastType.Success));
+            _listTable = await _tableRepos.GetAll();
+            await modal?.HideAsync();
+    }
+
+    private async Task SearchTable(ChangeEventArgs e)
+    {
+        if (e.Value.ToString() != "")
+        {
+            _listTable = await _tableRepos.Search(e.Value.ToString());
+            _currentTable = null;
+            _currentTableName = "";
+            _currentTableStatus = -1;
+        }
+        else
+        {
+            _listTable = await _tableRepos.GetAll();
+        }
+    }
+
+    #region Modal
+    private Modal modal;
+
+    private async Task OnShowModalClick()
+    {
+        await modal?.ShowAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        await modal?.HideAsync();
+    }
+    #endregion
+}

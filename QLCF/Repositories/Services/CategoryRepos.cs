@@ -1,5 +1,6 @@
 ﻿using QLCF.Repositories.Interfaces;
 using QuanLyCF.BLL.ViewModels.Category;
+using QuanLyCF.BLL.ViewModels.Food;
 using System.Net.Http.Json;
 
 namespace QLCF.Repositories.Services
@@ -37,6 +38,10 @@ namespace QLCF.Repositories.Services
         {
             var result = await _httpClient.PutAsJsonAsync($"api/Categories/update/{CategoryId}", request);
             return result.IsSuccessStatusCode;
+        }
+        public async Task<List<CategoryVM>> Search(string s)
+        {
+            return await _httpClient.GetFromJsonAsync<List<CategoryVM>>($"api/Categories/search/{s}");
         }
     }
 }

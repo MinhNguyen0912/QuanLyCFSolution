@@ -1,4 +1,5 @@
 ﻿using QLCF.Repositories.Interfaces;
+using QuanLyCF.BLL.ViewModels.Food;
 using QuanLyCF.BLL.ViewModels.Table;
 using System.Net.Http.Json;
 
@@ -11,9 +12,9 @@ namespace QLCF.Repositories.Services
         {
             _httpClient = httpClient;
         }
-        public async Task<bool> Add(TableVM request)
+        public async Task<bool> Add()
         {
-            var result = await _httpClient.PostAsJsonAsync("api/Tables", request);
+            var result = await _httpClient.GetAsync("api/Tables/add");
             return result.IsSuccessStatusCode;
         }
 
@@ -37,6 +38,10 @@ namespace QLCF.Repositories.Services
         {
             var result = await _httpClient.PutAsJsonAsync($"api/Tables/update/{TableId}", request);
             return result.IsSuccessStatusCode;
+        }
+        public async Task<List<TableVM>> Search(string s)
+        {
+            return await _httpClient.GetFromJsonAsync<List<TableVM>>($"api/Tables/search/{s}");
         }
     }
 }

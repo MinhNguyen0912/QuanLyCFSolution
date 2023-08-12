@@ -10,7 +10,6 @@ using QLCF.Repositories;
 using QLCF.Repositories.Interfaces;
 using QLCF.Repositories.Services;
 using Syncfusion.Blazor;
-
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
@@ -47,7 +46,6 @@ builder.Services.AddSyncfusionBlazor();
 builder.Services.AddHxServices();        // <------ ADD THIS LINE
 
 builder.Services.AddBlazorBootstrap(); // Add this line
-
 
 
 await builder.Build().RunAsync();

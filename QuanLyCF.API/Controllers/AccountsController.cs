@@ -16,8 +16,7 @@ namespace QuanLyCF.API.Controllers
         }
         [HttpPost]
         [Route("authenticate")]
-        [AllowAnonymous]
-        public async Task<IActionResult> Authenticate([FromBody]AuthenticateRequest request)
+        public async Task<IActionResult> Authenticate([FromBody] AuthenticateRequest request)
         {
             var result = await _userServices.Authenticate(request);
             if (result == null)
@@ -28,7 +27,6 @@ namespace QuanLyCF.API.Controllers
         }
         [HttpPost]
         [Route("register")]
-        [AllowAnonymous]
         public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
             var result = await _userServices.Register(request);
@@ -40,7 +38,6 @@ namespace QuanLyCF.API.Controllers
         }
         [HttpPost]
         [Route("validatetoken")]
-        [AllowAnonymous]
         public async Task<IActionResult> ValidateToken([FromBody] string token)
         {
             var result = await _userServices.ValidateToken(token);
@@ -49,7 +46,6 @@ namespace QuanLyCF.API.Controllers
 
         [HttpPost]
         [Route("getrole")]
-        [AllowAnonymous]
         public IActionResult GetRole([FromBody] string token)
         {
             var result = _userServices.GetRole(token);
@@ -57,11 +53,39 @@ namespace QuanLyCF.API.Controllers
         }
         [HttpPost]
         [Route("getuserbyusername")]
-        [AllowAnonymous]
         public async Task<IActionResult> GetUserByUserName([FromBody] string userName)
         {
             var result = await _userServices.GetUserByUserName(userName);
             return Ok(result);
+        }
+        [HttpGet]
+        [Route("all")]
+        public async Task<IActionResult> GetAll()
+        {
+            var result = await _userServices.GetAll();
+            return Ok(result);
+        }
+        [HttpGet]
+        [Route("allrole")]
+        public async Task<IActionResult> GetAllRole()
+        {
+            var result = await _userServices.GetAllRole();
+            return Ok(result);
+        }
+        [HttpPut]
+        [Route("update/{userName}")]
+        public async Task<IActionResult> Update([FromRoute] string userName, [FromBody] string pw)
+        {
+            var result = await _userServices.Update(userName, pw);
+            return Ok(result);
+        }
+        [HttpGet]
+        [Route("search/{s}")]
+        public async Task<IActionResult> Search([FromRoute] string s)
+        {
+            var list = await _userServices.Search(s);
+            return Ok(list);
+
         }
     }
 }

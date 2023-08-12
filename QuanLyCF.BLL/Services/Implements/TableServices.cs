@@ -2,6 +2,8 @@
 using AutoMapper.QueryableExtensions;
 using Microsoft.EntityFrameworkCore;
 using QuanLyCF.BLL.Services.Interfaces;
+using QuanLyCF.BLL.ViewModels.Category;
+using QuanLyCF.BLL.ViewModels.Food;
 using QuanLyCF.BLL.ViewModels.Table;
 using QuanLyCF.DAL.DBContext;
 using QuanLyCF.DAL.Enums;
@@ -19,12 +21,13 @@ namespace QuanLyCF.BLL.Services.Implements
             this._context = new QuanLyCafeDBContext();
             this._mapper = mapper;
         }
-        public async Task<bool> Add(TableVM request)
+        public async Task<bool> Add()
         {
+            var number = _context.Tables.Count();
             var obj = new Table()
             {
                 IdTable = new Guid(),
-                Name = request.Name,
+                Name = $"Bàn {number + 1}",
                 Status = TableStatus.Available
             };
             await _context.Tables.AddAsync(obj);
@@ -43,7 +46,7 @@ namespace QuanLyCF.BLL.Services.Implements
         public async Task<List<TableVM>> GetAll()
         {
             var list = await _context.Tables
-                .OrderBy(p=>p.Name.Length).ThenBy(p=>p.Name)
+                .OrderBy(p => p.Name.Length).ThenBy(p => p.Name)
                 .ProjectTo<TableVM>(_mapper.ConfigurationProvider)
                 .ToListAsync();
             return list;
@@ -58,10 +61,20 @@ namespace QuanLyCF.BLL.Services.Implements
         public async Task<bool> Update(Guid TableId, TableVM request)
         {
             var table = await _context.Tables.FindAsync(TableId);
-            table.Name = request.Name;
             table.Status = request.Status;
+            _context.Update(table);
             await _context.SaveChangesAsync();
             return true;
         }
+        public async Task<List<TableVM>> Search(string s)
+        {
+            var list = await _context.Tables
+                .Where(p => p.Name.Contains(s))
+                .OrderBy(p => p.Name.Length).ThenBy(p => p.Name)
+                .ProjectTo<TableVM>(_mapper.ConfigurationProvider)
+                .ToListAsync();
+            return list;
+        }
+
     }
 }

@@ -2,16 +2,23 @@
 @using BlazorBootstrap
 @using Blazored.SessionStorage;
 @using GemBox.Spreadsheet;
+@using Net.ConnectCode.BarcodeFontsStandard2D;
+@using Newtonsoft.Json;
 @using QLCF.Repositories.Interfaces;
 @using QLCF.Repositories;
+@using QRCoder;
 @using QuanLyCF.BLL.ViewModels.Bill;
 @using QuanLyCF.BLL.ViewModels.BillInfo;
 @using QuanLyCF.BLL.ViewModels.Category;
 @using QuanLyCF.BLL.ViewModels.Food;
 @using QuanLyCF.BLL.ViewModels.Table;
+@using QuanLyCF.BLL.ViewModels;
 @using QuanLyCF.DAL.Entities;
 @using QuanLyCF.DAL.Enums;
 @using System.Data;
+@using Syncfusion.Drawing;
+
+
 @inject Microsoft.JSInterop.IJSRuntime JS
 
 
@@ -156,7 +163,7 @@
                     </div>
                     <div class="dropdown">
                         <button style="color: rgba(0,0,0,1); width: 112px;" class="button wood2 item_btn btn btn-secondary dropdown-toggle btn-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            @(_currentPayBy == -1 ? "Lựa chọn" : (_currentPayBy == 0 ? "Tiền mặt" : "Chuyển khoản"))
+                            @(_currentPayBy == 0 ? "Tiền mặt" : "Chuyển khoản")
                         </button>
 
                         <ul style="max-height:114px;overflow:scroll;" class="dropdown-menu">
@@ -184,11 +191,20 @@
         </div>
     </div>
     <Toasts class="p-3" Messages="messages" AutoHide="true" Delay="2000" Placement="ToastsPlacement.TopLeft" />
+    <Modal @ref="modal" Title="Quét mã QR">
+        <BodyTemplate>
+            <div style="height: 476px;overflow:hidden">
+                <img style="width: 100%; height:570px;margin-top:-25px" src="@imageSrc"/>
 
+            </div>
+        </BodyTemplate>
+    </Modal>
 }
 
 
 @code {
+    [Inject]
+    private HttpClient httpClient{ get; set; }
     [Inject]
     private ITableRepos _tableRepos { get; set; }
     [Inject]
@@ -204,15 +220,18 @@
     [Inject]
     ISessionStorageService _session { get; set; }
 
-    List<TableVM> _listTable;
-    List<CategoryVM> _listCategory;
-    List<FoodVM> _listFood;
-    List<BillInfoVM> _listBillInfo;
-    BillVM _currentBill;
-    TableVM _currentTable;
-    int _currentPayBy = -1;
-    CategoryVM _currentCategory;
-    FoodVM _currentFood;
+    List<TableVM>? _listTable;
+    List<CategoryVM>? _listCategory;
+    List<FoodVM>? _listFood;
+    List<BillInfoVM>? _listBillInfo;
+    BillVM? _currentBill;
+    TableVM? _currentTable;
+    int _currentPayBy = 0;
+    CategoryVM? _currentCategory;
+    FoodVM? _currentFood;
+    private string imageSrc ="";
+    //private string QRByte = "";
+
 
     int _rowCount = 0;
     int _lastRowCount = 0;
@@ -258,6 +277,19 @@
         Message = $"Thanh toán thành công",
     };
     //-----------------------------------------------
+    #endregion
+    #region Modal
+    private Modal modal;
+
+    private async Task OnShowModalClick()
+    {
+        await modal?.ShowAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        await modal?.HideAsync();
+    }
     #endregion
     protected override async Task OnInitializedAsync()
     {
@@ -325,7 +357,7 @@
             _listBillInfo = null;
             _currentPrice = "";
         }
-        _currentPayBy = -1;
+        _currentPayBy = 0;
         _currentDiscount = "";
         note = _currentBill == null ? "" : _currentBill.Note;
     }
@@ -442,15 +474,13 @@
         }
     }
 
+    private string qrCodeStr = "";
+
     private async Task Pay()
     {
         if (_currentBill == null)
         {
             messages.Add(CreateToastChooseTable(ToastType.Warning));
-        }
-        else if (_currentPayBy == -1)
-        {
-            messages.Add(CreateToastChoosePayBy(ToastType.Warning));
         }
         else
         {
@@ -458,8 +488,30 @@
             var claims = await _userRepos.ValidateToken(token);
             var userName = claims["Name"];
             var user = await _userRepos.GetUserByUserName(userName.ToString());
+            if (_currentPayBy==1)
+            {
+                var totalPrice = await _billRepos.GetTotalPrice(_currentBill.IdBill);
+                if (_currentDiscount!=""&& _currentDiscount!= "e")
+                {
+                    totalPrice *= (100 - int.Parse(_currentDiscount)) / 100;
+                }
+                var result = await httpClient.PostAsJsonAsync<QRRequest>("https://api.vietqr.io/v2/generate", new QRRequest()
+                    {
+                        accountNo = "0862559892",
+                        accountName = "NGUYEN DANG CONG MINH",
+                        acqId = 970422,
+                        amount = (int)totalPrice,
+                        addInfo = "",
+                        format = "text",
+                        template = "print"
+                    });
+                var content = await result.Content.ReadAsStringAsync();
+                var response = JsonConvert.DeserializeObject<QRResponse>(content);
+                imageSrc = response.data.qrDataURL;
+                await modal.ShowAsync();
+                await Task.Delay(3000);
+            }
             await _billRepos.Pay(_currentBill.IdBill, user.Id, (_currentDiscount != "" && _currentDiscount != "e") ? int.Parse(_currentDiscount) : 0);
-            //_listCategory = await _categoryRepos.GetAll();
             messages.Add(CreateToastPaySuccess(ToastType.Success));
             CreateDocument();
 
@@ -469,7 +521,7 @@
             _currentBill = null;
             _currentPrice = "";
             _listBillInfo = null;
-            _currentPayBy = -1;
+            _currentPayBy = 0;
         }
     }
 
@@ -481,6 +533,7 @@
         CellStyle style = sheet.Rows[0].Style;
         style.Font.Weight = ExcelFont.BoldWeight;
         style.HorizontalAlignment = HorizontalAlignmentStyle.Center;
+
         sheet.Columns[0].Style.HorizontalAlignment = HorizontalAlignmentStyle.Center;
         sheet.Columns[0].SetWidth(150, LengthUnit.Pixel);
         sheet.Columns[1].SetWidth(150, LengthUnit.Pixel);
@@ -512,9 +565,9 @@
             //Save the created Excel document to MemoryStream
             book.Save(stream, options);
 
-
             //Download the excel file.
             await JS.SaveAs("Sample.xlsx", stream.ToArray());
+
         }
     }
 

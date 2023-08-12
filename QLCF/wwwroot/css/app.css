@@ -1,6 +1,23 @@
 ﻿@import url('open-iconic/font/css/open-iconic-bootstrap.min.css');
 
 
+@font-face {
+    font-family: CCodeQR;
+    src: url("../fonts/CCodeQR_Trial.woff") format("woff");
+}
+
+#qrBarcodeFonts {
+    font-weight: normal;
+    font-style: normal;
+    line-height: normal;
+    font-family: 'CCodeQR', sans-serif;
+    font-size: 12px;
+    letter-spacing: -1px;
+    line-height: 98%;
+}
+
+
+
 .fadeInDown {
     -webkit-animation-name: fadeInDown;
     animation-name: fadeInDown;

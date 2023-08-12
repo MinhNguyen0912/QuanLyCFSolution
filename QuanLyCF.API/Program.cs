@@ -28,6 +28,7 @@ builder.Services.AddAutoMapper(config => { config.AddExpressionMapping(); }, Ass
 
 //DI
 builder.Services.AddTransient<UserManager<User>, UserManager<User>>();
+builder.Services.AddTransient<RoleManager<Role>, RoleManager<Role>>();
 builder.Services.AddTransient<SignInManager<User>, SignInManager<User>>();
 
 builder.Services.AddTransient<IBillServices, BillServices>();
@@ -41,7 +42,14 @@ builder.Services.AddTransient<IUserServices, UserServices>();
 SpreadsheetInfo.SetLicense("FREE-LIMITED-KEY");
 
 
-builder.Services.AddIdentity<User, Role>()
+builder.Services.AddIdentity<User, Role>(option => option.Password = new PasswordOptions()
+{
+    RequireDigit = false,
+    RequiredLength = 1,
+    RequireLowercase = false,
+    RequireUppercase = false,
+    RequireNonAlphanumeric = false,
+})
     .AddEntityFrameworkStores<QuanLyCafeDBContext>()
     .AddDefaultTokenProviders();
 

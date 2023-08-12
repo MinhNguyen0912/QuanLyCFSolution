@@ -1,11 +1,19 @@
 ﻿@page "/food"
-@attribute [Authorize]
+@attribute [Authorize(Roles ="admin")]
 @using Microsoft.AspNetCore.Authorization;
 @using QLCF.Repositories.Interfaces;
+@using QLCF.Repositories;
 @using QuanLyCF.BLL.ViewModels.Category;
 @using QuanLyCF.BLL.ViewModels.Food;
 @using QuanLyCF.DAL.Enums;
+@inject BlazorSchoolAuthenticationStateProvider authen
 
+<AuthorizeView Roles="staff">
+    <Authorized>
+
+        <p>abc</p>
+    </Authorized>
+</AuthorizeView>
 @if (_listCategory != null && _listFood != null)
 {
     <div class="box fadeInDown" style="height: 88vh;">
@@ -119,11 +127,11 @@
     private IFoodRepos _foodRepos { get; set; }
 
 
-    private List<CategoryVM> _listCategory;
-    private List<FoodVM> _listFood;
-    private CategoryVM _currentCategory;
+    private List<CategoryVM>? _listCategory;
+    private List<FoodVM>? _listFood;
+    private CategoryVM? _currentCategory;
     private string _currentCategoryName = "";
-    private FoodVM _currentFood;
+    private FoodVM? _currentFood;
     private string _currentFoodName = "";
     private string _currentFoodPrice = "";
     private FoodVM FoodAdd = new FoodVM(){Name=""};
@@ -170,7 +178,7 @@
             Type = toastType,
             Title = "Thông báo",
             HelpText = $"{DateTime.Now}",
-            Message = $"Xóa món thành công",
+            Message = $"Xóa thành công",
         };
     private ToastMessage CreateToastAddSuccess(ToastType toastType)
     => new ToastMessage
@@ -178,7 +186,7 @@
             Type = toastType,
             Title = "Thông báo",
             HelpText = $"{DateTime.Now}",
-            Message = $"Thêm món thành công",
+            Message = $"Thêm thành công",
         };
     private ToastMessage CreateToastFillInfo(ToastType toastType)
     => new ToastMessage
@@ -309,7 +317,7 @@
 
     private async Task AddFood()
     {
-        if (FoodAdd.Name != null && FoodAdd.Price == 0 && FoodAdd.CategoryId != Guid.Empty)
+        if (FoodAdd.Name != "" && FoodAdd.Price == 0 && FoodAdd.CategoryId != Guid.Empty)
         {
             await _foodRepos.Add(FoodAdd);
             messages.Add(CreateToastAddSuccess(ToastType.Success));
@@ -329,7 +337,6 @@
     {
         if (e.Value.ToString()!="")
         {
-            Console.WriteLine(e.Value.ToString());
             _listFood = await _foodRepos.Search(e.Value.ToString());
             _currentCategory = null;
             _currentCategoryName = "";

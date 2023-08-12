@@ -1,6 +1,7 @@
 ﻿using Azure.Core;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Logging;
@@ -8,6 +9,7 @@ using Microsoft.IdentityModel.Tokens;
 using Newtonsoft.Json.Linq;
 using QuanLyCF.BLL.Services.Interfaces;
 using QuanLyCF.BLL.ViewModels;
+using QuanLyCF.DAL.DBContext;
 using QuanLyCF.DAL.Entities;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -19,18 +21,54 @@ namespace QuanLyCF.BLL.Services.Implements
     public class UserServices : IUserServices
     {
         private readonly UserManager<User> _userManager;
+        private readonly RoleManager<Role> _roleManager;
         private readonly SignInManager<User> _signInManager;
         private readonly IConfiguration _config;
-        public UserServices(UserManager<User> userManager, SignInManager<User> signInManager, IConfiguration config)
+        private readonly QuanLyCafeDBContext _context;
+        public UserServices(UserManager<User> userManager, SignInManager<User> signInManager, IConfiguration config, RoleManager<Role> roleManager)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _config = config;
+            _roleManager = roleManager;
+            this._context = new QuanLyCafeDBContext();
+
         }
         public UserServices()
         {
 
         }
+
+        public async Task<List<User>> GetAll()
+        {
+            return await _userManager.Users.ToListAsync();
+        }
+        public async Task<List<Role>> GetAllRole()
+        {
+            return await _roleManager.Roles.ToListAsync();
+        }
+        public async Task<bool> Update(string userName, string pw)
+        {
+            var user = await _userManager.FindByNameAsync(userName);
+            user.PasswordHash = _userManager.PasswordHasher.HashPassword(user, pw);
+            var result = await _userManager.UpdateAsync(user);
+            if (!result.Succeeded)
+            {
+                return false;
+            }
+            return true;
+            //var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+            //var passwordValidator = new PasswordValidator<User>();
+
+            //var resultValidatePw = await passwordValidator.ValidateAsync(_userManager, user, pw);
+            //if (resultValidatePw.Succeeded)
+            //{
+            //    var result = await _userManager.ResetPasswordAsync(user, resetToken,pw);
+            //    return result.Succeeded;
+            //}
+            //return false;
+        }
+
         public async Task<User> GetUserByUserName(string userName)
         {
             var user = await _userManager.FindByNameAsync(userName);
@@ -72,16 +110,11 @@ namespace QuanLyCF.BLL.Services.Implements
             };
 
         }
-        
-
         public async Task<bool> Register(RegisterRequest request)
         {
-            if (request.Password != request.ConfirmPassword)
-            {
-                return false;
-            }
             var user = new User()
             {
+                Id = new Guid(),
                 UserName = request.UserName,
                 Email = request.Email,
                 RoleId = request.RoleId
@@ -89,11 +122,13 @@ namespace QuanLyCF.BLL.Services.Implements
             var result = await _userManager.CreateAsync(user, request.Password);
             if (result.Succeeded)
             {
-                return true;
-            }
-            return false;
-        }
+                var userRole = new IdentityUserRole<Guid>() { RoleId =  request.RoleId ,UserId = user.Id};
+                _context.UserRoles.Add(userRole);
+                await _context.SaveChangesAsync();
 
+            }
+            return result.Succeeded;
+        }
         public async Task<IDictionary<string, object>> ValidateToken(string token)
         {
             IdentityModelEventSource.ShowPII = true;
@@ -129,6 +164,12 @@ namespace QuanLyCF.BLL.Services.Implements
             };
             var claims = handler.ValidateToken(token, validations, out var tokenSecure);
             return claims.Claims.First(p=>p.Type==ClaimTypes.Role).Value;
+        }
+        public async Task<List<User>> Search(string s)
+        {
+            var users = await _userManager.Users.ToListAsync();
+            var result = users.Where(p=>p.UserName.Contains(s)).ToList();
+            return result;
         }
     }
 }

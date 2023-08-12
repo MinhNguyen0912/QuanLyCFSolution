@@ -27,7 +27,7 @@ namespace QuanLyCF.DAL.DBContext
             builder.ApplyConfiguration(new FoodConfiguration());
 
             builder.Entity<IdentityUserClaim<Guid>>().ToTable("UserClaims");
-            builder.Entity<IdentityUserRole<Guid>>().ToTable("UserRoles").HasKey(p => p.RoleId);
+            builder.Entity<IdentityUserRole<Guid>>().ToTable("UserRoles").HasKey(p =>new { p.RoleId,p.UserId } );
             builder.Entity<IdentityUserLogin<Guid>>().ToTable("UserLogins").HasKey(p => p.UserId);
             builder.Entity<IdentityRoleClaim<Guid>>().ToTable("RoleClaims");
             builder.Entity<IdentityUserToken<Guid>>().ToTable("UserTokens").HasKey(p => p.UserId);

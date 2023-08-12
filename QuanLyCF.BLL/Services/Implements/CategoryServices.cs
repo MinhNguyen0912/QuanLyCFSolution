@@ -3,8 +3,10 @@ using AutoMapper.QueryableExtensions;
 using Microsoft.EntityFrameworkCore;
 using QuanLyCF.BLL.Services.Interfaces;
 using QuanLyCF.BLL.ViewModels.Category;
+using QuanLyCF.BLL.ViewModels.Food;
 using QuanLyCF.DAL.DBContext;
 using QuanLyCF.DAL.Entities;
+using QuanLyCF.DAL.Enums;
 
 namespace QuanLyCF.BLL.Services.Implements
 {
@@ -61,6 +63,14 @@ namespace QuanLyCF.BLL.Services.Implements
             obj.Name = request.Name;
             await _context.SaveChangesAsync();
             return true;
+        }
+        public async Task<List<CategoryVM>> Search(string s)
+        {
+            var list = await _context.Categories
+                .Where(p => p.Status == 0 && p.Name.Contains(s))
+                .ProjectTo<CategoryVM>(_mapper.ConfigurationProvider)
+                .ToListAsync();
+            return list;
         }
     }
 }

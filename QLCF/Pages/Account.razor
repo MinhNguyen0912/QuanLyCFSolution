@@ -1,0 +1,282 @@
+﻿@page "/account"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization;
+@using QLCF.Repositories.Interfaces;
+@using QRCoder;
+@using QuanLyCF.BLL.ViewModels.Category;
+@using QuanLyCF.BLL.ViewModels.Food;
+@using QuanLyCF.BLL.ViewModels.Table;
+@using QuanLyCF.BLL.ViewModels;
+@using QuanLyCF.DAL.Entities;
+@using QuanLyCF.DAL.Enums;
+
+@if (_listUser != null && _listRole != null)
+{
+    <div class="box fadeInDown" style="height: 88vh;">
+        <div style="width: 50%" class="table_box container text-center">
+            <div style="margin: 20px 0 40px 0;display: flex;justify-content: space-between;">
+                <div @onclick="()=>OnShowModalClick()" style="min-width: 120px;" class="button wood">
+                    <div>Thêm tài khoản</div>
+                </div>
+                <div @onclick="async()=>await UpdateUser()" style="min-width: 120px;" class="button wood">
+                    <div>Sửa mật khẩu</div>
+                </div>
+            </div>
+            <div style="height: 400px;overflow: scroll; box-shadow: 0 0 20px black; border-radius: 8px;">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th scope="col">STT</th>
+                            <th scope="col">Tên tài khoản</th>
+                            <th scope="col">Chức vụ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in _listUser.Select((value, index) => (value, index)))
+                        {
+                            if (_currentUser != null && _listUser.FindIndex(0, p => p.Id == _currentUser.Id) == item.index)
+                            {
+                                <tr style="background-color:rgba(0,0,0,0.2)" @onclick="async()=>await GetCurrentUser(item.value)">
+                                    <th scope="row">@(item.index + 1)</th>
+                                    <td>@item.value.UserName</td>
+                                    <td>@GetRoleName(item.value)</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                <tr @onclick="async()=>await GetCurrentUser(item.value)">
+                                    <th scope="row">@(item.index + 1)</th>
+                                    <td>@item.value.UserName</td>
+                                    <td>@GetRoleName(item.value)</td>
+                                </tr>
+
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div style="width: 50%;margin-left: 40px;">
+            <div class="search-box" style="margin: 20px 0 50px 0;padding-left: 70px;">
+                <button class="btn-search"><i class="fas fa-search"></i></button>
+                <input @oninput="async(e)=>await SearchUser(e)" type="text" class="input-search" placeholder="Type to Search...">
+            </div>
+            <div style="margin-top: 20px; display: flex;">
+                <span style="margin-right: 20px;width: 110px;display: block;">Tên tài khoản:</span>
+                <input readonly @bind="_currentUserName" style="width: 320px;" type="text">
+            </div>
+            <div style="margin-top: 20px; display: flex;">
+                <span style="margin-right: 20px;width: 110px;display: block;">Mật khẩu:</span>
+                <input @bind="_newUserPassword" style="width: 320px;" type="password">
+            </div>
+        </div>
+    </div>
+    <Toasts class="p-3" Messages="messages" AutoHide="true" Delay="2000" Placement="ToastsPlacement.TopLeft" />
+    <Modal @ref="modal" Title="Thêm tài khoản mới">
+        <BodyTemplate>
+            <div style="display: flex;">
+                <span style="margin-right: 20px;width: 110px;display: block;">Tên tài khoản:</span>
+                <input @bind="_currentAddUser.UserName" style="width: 320px;" type="text">
+            </div>
+            <div style="margin-top: 20px; display: flex;">
+                <span style="margin-right: 20px;width: 110px;display: block;">Mật khẩu:</span>
+                <input @bind="_currentAddUser.Password" style="width: 320px;" type="text">
+            </div>
+            <div style="margin-top: 20px; display: flex;">
+                <span style="margin-right: 20px;width: 110px;display: block;">Email:</span>
+                <input @bind="_currentAddUser.Email" style="width: 320px;" type="email">
+            </div>
+            <div style="margin-top: 20px; display: flex;">
+                <span style="margin-right: 20px;width: 110px;display: block;">Chức vụ:</span>
+                <select @onchange="(value)=>GetRoleAdd(value)" value="@_currentAddUser.RoleId" required style="width: 320px;" name="" id="">
+                    <option disabled selected hidden value="">Chọn chức vụ</option>
+                    <option value="48235552-b65a-47a2-9b6b-0a16e6ba1d5c">Admin</option>
+                    <option value="97f4c414-d3d9-4ee8-940d-568444fbfc55">Staff</option>
+                </select>
+            </div>
+        </BodyTemplate>
+        <FooterTemplate>
+            <Button Color="ButtonColor.Secondary" @onclick="async()=>await OnHideModalClick()">Close</Button>
+            <Button @onclick="async()=>await AddUser()" Color="ButtonColor.Primary">Thêm tài khoản</Button>
+        </FooterTemplate>
+    </Modal>
+}
+
+@code {
+    [Inject]
+    private IUserRepos _userRepos { get; set; }
+
+
+    private List<User>? _listUser;
+    private List<Role>? _listRole;
+    private User? _currentUser;
+    private RegisterRequest _currentAddUser = new RegisterRequest() { UserName = "", Password = "", Email = "" };
+
+    private string _currentUserName = "";
+    private string _newUserPassword = "";
+
+    #region Toast options
+    //Toast options--------------------------------
+    List<ToastMessage> messages = new List<ToastMessage>();
+
+    private ToastMessage CreateToastChooseUser(ToastType toastType)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Lưu ý",
+            HelpText = $"{DateTime.Now}",
+            Message = $"Vui lòng chọn tài khoản",
+        };
+    private ToastMessage CreateToastUpdateSuccess(ToastType toastType)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Thông báo",
+            HelpText = $"{DateTime.Now}",
+            Message = $"Cập nhật thành công",
+        };
+    private ToastMessage CreateToastUpdateFail(ToastType toastType)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Thông báo",
+            HelpText = $"{DateTime.Now}",
+            Message = $"Cập nhật thất bại. Vui lòng kiểm tra lại mật khẩu mới!",
+        };
+    private ToastMessage CreateToastAddSuccess(ToastType toastType)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Thông báo",
+            HelpText = $"{DateTime.Now}",
+            Message = $"Thêm thành công",
+        };
+    private ToastMessage CreateToastAddFail(ToastType toastType)
+    => new ToastMessage
+    {
+        Type = toastType,
+        Title = "Thông báo",
+        HelpText = $"{DateTime.Now}",
+        Message = $"Thêm thất bại",
+    };
+    private ToastMessage CreateToastFillInfo(ToastType toastType)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Lưu ý",
+            HelpText = $"{DateTime.Now}",
+            Message = $"Vui lòng nhập đầy đủ thông tin",
+        };
+    //-----------------------------------------------
+    #endregion
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _listUser = await _userRepos.GetAll();
+        _listRole = await _userRepos.GetAllRole();
+    }
+
+    private async Task GetCurrentUser(User user)
+    {
+        _currentUser = await _userRepos.GetUserByUserName(user.UserName);
+        _currentUserName = _currentUser.UserName;
+    }
+    private string GetRoleName(User user)
+    {
+        return _listRole.FirstOrDefault(p => p.Id == user.RoleId).Name;
+    }
+    private async Task UpdateUser()
+    {
+        if (_currentUser == null)
+        {
+            messages.Add(CreateToastChooseUser(ToastType.Warning));
+            return;
+        }
+        if (_newUserPassword == "")
+        {
+            messages.Add(CreateToastFillInfo(ToastType.Warning));
+            return;
+        }
+        var result = await _userRepos.Update(_currentUser.UserName, _newUserPassword);
+        if (result)
+        {
+            messages.Add(CreateToastUpdateSuccess(ToastType.Success));
+        }
+        else
+        {
+            messages.Add(CreateToastUpdateFail(ToastType.Warning));
+
+        }
+        _listUser = await _userRepos.GetAll();
+        _currentUser = null;
+        _currentUserName = "";
+        _newUserPassword = "";
+
+    }
+
+    private async Task AddUser()
+    {
+        if (_currentAddUser.UserName == "" || _currentAddUser.Password == "" || _currentAddUser.Email == "" || _currentAddUser.RoleId == Guid.Empty)
+        {
+            messages.Add(CreateToastFillInfo(ToastType.Warning));
+        }
+        else
+        {
+            var result = await _userRepos.Register(_currentAddUser);
+            if (result)
+            {
+                messages.Add(CreateToastAddSuccess(ToastType.Success));
+            }
+            else
+            {
+            messages.Add(CreateToastAddFail(ToastType.Warning));
+                
+            }
+
+        _listUser = await _userRepos.GetAll();
+        _currentUser = null;
+        _currentUserName = "";
+        _newUserPassword = "";
+        _currentAddUser = new RegisterRequest() { UserName = "", Password = "", Email = "" };
+        }
+
+    }
+
+    private async Task SearchUser(ChangeEventArgs e)
+    {
+        if (e.Value.ToString() != "")
+        {
+            _listUser = await _userRepos.Search(e.Value.ToString());
+            _currentUser = null;
+            _currentUserName = "";
+            _newUserPassword = "";
+        }
+        else
+        {
+            _listUser = await _userRepos.GetAll();
+        }
+    }
+    private async Task GetRoleAdd(ChangeEventArgs e)
+    {
+        _currentAddUser.RoleId = Guid.Parse(e.Value.ToString());
+    }
+
+    #region Modal
+    private Modal modal;
+
+    private async Task OnShowModalClick()
+    {
+        await modal?.ShowAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        await modal?.HideAsync();
+    }
+    #endregion
+}

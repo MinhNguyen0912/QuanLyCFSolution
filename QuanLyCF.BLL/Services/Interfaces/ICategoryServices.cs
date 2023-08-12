@@ -9,6 +9,7 @@ namespace QuanLyCF.BLL.Services.Interfaces
         public Task<bool> Update(Guid CategoryId, CategoryVM request);
         public Task<bool> Delete(Guid CategoryId);
         public Task<CategoryVM> GetById(Guid categoryId);
+        public Task<List<CategoryVM>> Search(string s);
 
     }
 }
