@@ -17,6 +17,9 @@
 @using QuanLyCF.DAL.Enums;
 @using System.Data;
 @using Syncfusion.Drawing;
+@using Syncfusion.Pdf;
+@using Syncfusion.Pdf.Graphics;
+@using Syncfusion.Pdf.Grid;
 
 
 @inject Microsoft.JSInterop.IJSRuntime JS
@@ -194,7 +197,7 @@
     <Modal @ref="modal" Title="Quét mã QR">
         <BodyTemplate>
             <div style="height: 476px;overflow:hidden">
-                <img style="width: 100%; height:570px;margin-top:-25px" src="@imageSrc"/>
+                <img style="width: 100%; height:570px;margin-top:-25px" src="@imageSrc" />
 
             </div>
         </BodyTemplate>
@@ -204,7 +207,7 @@
 
 @code {
     [Inject]
-    private HttpClient httpClient{ get; set; }
+    private HttpClient httpClient { get; set; }
     [Inject]
     private ITableRepos _tableRepos { get; set; }
     [Inject]
@@ -229,7 +232,7 @@
     int _currentPayBy = 0;
     CategoryVM? _currentCategory;
     FoodVM? _currentFood;
-    private string imageSrc ="";
+    private string imageSrc = "";
     //private string QRByte = "";
 
 
@@ -270,12 +273,12 @@
         };
     private ToastMessage CreateToastPaySuccess(ToastType toastType)
     => new ToastMessage
-    {
-        Type = toastType,
-        Title = "Thông báo",
-        HelpText = $"{DateTime.Now}",
-        Message = $"Thanh toán thành công",
-    };
+        {
+            Type = toastType,
+            Title = "Thông báo",
+            HelpText = $"{DateTime.Now}",
+            Message = $"Thanh toán thành công",
+        };
     //-----------------------------------------------
     #endregion
     #region Modal
@@ -488,19 +491,20 @@
             var claims = await _userRepos.ValidateToken(token);
             var userName = claims["Name"];
             var user = await _userRepos.GetUserByUserName(userName.ToString());
-            if (_currentPayBy==1)
+            if (_currentPayBy == 1)
             {
                 var totalPrice = await _billRepos.GetTotalPrice(_currentBill.IdBill);
-                if (_currentDiscount!=""&& _currentDiscount!= "e")
+                if (_currentDiscount != "" && _currentDiscount != "e")
                 {
                     totalPrice *= (100 - int.Parse(_currentDiscount)) / 100;
                 }
+                var lastPrice = Convert.ToInt32(Math.Ceiling(totalPrice));
                 var result = await httpClient.PostAsJsonAsync<QRRequest>("https://api.vietqr.io/v2/generate", new QRRequest()
                     {
                         accountNo = "0862559892",
                         accountName = "NGUYEN DANG CONG MINH",
                         acqId = 970422,
-                        amount = (int)totalPrice,
+                        amount = lastPrice,
                         addInfo = "",
                         format = "text",
                         template = "print"
@@ -513,7 +517,7 @@
             }
             await _billRepos.Pay(_currentBill.IdBill, user.Id, (_currentDiscount != "" && _currentDiscount != "e") ? int.Parse(_currentDiscount) : 0);
             messages.Add(CreateToastPaySuccess(ToastType.Success));
-            CreateDocument();
+            CreatePdf();
 
             _listTable = await _tableRepos.GetAll();
             _currentDiscount = "";
@@ -522,6 +526,7 @@
             _currentPrice = "";
             _listBillInfo = null;
             _currentPayBy = 0;
+
         }
     }
 
@@ -552,10 +557,10 @@
             sheet.Cells[r, 1].Value = item.FoodName;
             sheet.Cells[r, 2].Value = item.Count;
             sheet.Cells[r, 3].Value = item.Price;
-            sheet.Cells[r, 4].Value = item.Price*item.Count;
+            sheet.Cells[r, 4].Value = item.Price * item.Count;
         }
         sheet.Cells[data.Count + 1, 3].Value = "Giảm giá";
-        sheet.Cells[data.Count + 1, 4].Value = (_currentDiscount == "" || _currentDiscount == "e") ?"0 %":(_currentDiscount+" %");
+        sheet.Cells[data.Count + 1, 4].Value = (_currentDiscount == "" || _currentDiscount == "e") ? "0 %" : (_currentDiscount + " %");
         sheet.Cells[data.Count + 2, 3].Value = "Tổng tiền";
         sheet.Cells[data.Count + 2, 4].Value = await _billRepos.GetTotalPrice(_currentBill.IdBill);
         SaveOptions options = GetSaveOptions("XLSX");
@@ -568,6 +573,116 @@
             //Download the excel file.
             await JS.SaveAs("Sample.xlsx", stream.ToArray());
 
+        }
+    }
+    public async void CreatePdf()
+    {
+        using (PdfDocument pdfDocument = new PdfDocument())
+        {
+            //Add page to the PDF document.
+            PdfPage currentPage = pdfDocument.Pages.Add();
+            SizeF clientSize = currentPage.GetClientSize();
+            //Create a new font.
+            PdfStandardFont font = new PdfStandardFont(PdfFontFamily.Helvetica, 14, PdfFontStyle.Regular);
+
+            //Create a text element to draw a text in PDF page.
+            PdfTextElement title = new PdfTextElement("Hoa Don Thanh Toan", font, PdfBrushes.Black);
+            title.StringFormat = new PdfStringFormat(PdfTextAlignment.Right);
+            PdfLayoutResult result = title.Draw(currentPage, new PointF(clientSize.Width - 25, 23));
+
+
+
+            PdfStandardFont contentFont = new PdfStandardFont(PdfFontFamily.Helvetica, 10, PdfFontStyle.Regular);
+
+
+            //Create a PdfGrid.
+            PdfGrid pdfGrid = new PdfGrid();
+            pdfGrid.Style.Font = new PdfStandardFont(PdfFontFamily.Helvetica, 10, PdfFontStyle.Regular);
+            pdfGrid.Columns.Add(4);
+            pdfGrid.Columns[1].Width = 70;
+            pdfGrid.Columns[2].Width = 70;
+            pdfGrid.Columns[3].Width = 70;
+            pdfGrid.Headers.Add(1);
+            PdfStringFormat stringFormat = new PdfStringFormat(PdfTextAlignment.Right, PdfVerticalAlignment.Middle);
+            PdfGridRow header = pdfGrid.Headers[0];
+
+            header.Cells[0].Value = "Ten Mon";
+            header.Cells[0].StringFormat.LineAlignment = PdfVerticalAlignment.Middle;
+            header.Cells[1].Value = "So Luong";
+            header.Cells[1].StringFormat = stringFormat;
+            header.Cells[2].Value = "Don Gia";
+            header.Cells[2].StringFormat = stringFormat;
+            header.Cells[3].Value = "Thanh Tien";
+            header.Cells[3].StringFormat = stringFormat;
+
+            PdfGridCellStyle cellStyle = new PdfGridCellStyle();
+            cellStyle.Borders.All = PdfPens.Transparent;
+            cellStyle.TextBrush = PdfBrushes.White;
+            cellStyle.BackgroundBrush = new PdfSolidBrush(Color.FromArgb(1, 53, 67, 168));
+
+            for (int i = 0; i < header.Cells.Count; i++)
+            {
+                PdfGridCell cell = header.Cells[i];
+                cell.Style = cellStyle;
+            }
+
+            foreach (var item in await _billInfoRepos.GetAllByIdBill(_currentBill.IdBill))
+            {
+                PdfGridRow row = pdfGrid.Rows.Add();
+                row.Cells[0].Value = item.FoodName;
+                row.Cells[0].StringFormat.LineAlignment = PdfVerticalAlignment.Middle;
+
+                row.Cells[1].Value = item.Count.ToString();
+                row.Cells[1].StringFormat = stringFormat;
+
+                row.Cells[2].Value = item.Price.ToString();
+                row.Cells[2].StringFormat = stringFormat;
+
+                row.Cells[3].Value = (item.Count * item.Price).ToString();
+                row.Cells[3].StringFormat = stringFormat;
+            }
+
+            //Applying built-in style to the PDF grid.
+            pdfGrid.ApplyBuiltinStyle(PdfGridBuiltinStyle.PlainTable3);
+            PdfGridStyle gridStyle = new PdfGridStyle();
+            gridStyle.CellPadding = new PdfPaddings(5, 5, 5, 5);
+            pdfGrid.Style = gridStyle;
+
+            PdfGridLayoutFormat layoutFormat = new PdfGridLayoutFormat();
+            layoutFormat.Layout = PdfLayoutType.Paginate;
+            result = pdfGrid.Draw(currentPage, 14, result.Bounds.Bottom + 30, clientSize.Width - 35, layoutFormat);
+
+            ///////
+            currentPage.Graphics.DrawRectangle(new PdfSolidBrush(Color.FromArgb(255, 239, 242, 255)), new RectangleF(result.Bounds.Right - 100, result.Bounds.Bottom + 20, 100, 20));
+
+            PdfTextElement element = new PdfTextElement("Giam gia:", font);
+            element.Draw(currentPage, new RectangleF(result.Bounds.Right - 200, result.Bounds.Bottom + 22, result.Bounds.Width, result.Bounds.Height));
+            element = new PdfTextElement((_currentDiscount==""||_currentDiscount=="e")?"0%":(_currentDiscount+"%"), font);
+            element.StringFormat = new PdfStringFormat(PdfTextAlignment.Right);
+            result = element.Draw(currentPage, new RectangleF(15, result.Bounds.Bottom + 22, result.Bounds.Width, result.Bounds.Height));            
+            ///
+
+
+            currentPage.Graphics.DrawRectangle(new PdfSolidBrush(Color.FromArgb(255, 239, 242, 255)), new RectangleF(result.Bounds.Right - 100, result.Bounds.Bottom + 20, 100, 20));
+
+            element = new PdfTextElement("Tong Tien:", font);
+            element.Draw(currentPage, new RectangleF(result.Bounds.Right - 200, result.Bounds.Bottom + 22, result.Bounds.Width, result.Bounds.Height));
+            var totalPrice = await _billRepos.GetTotalPrice(_currentBill.IdBill);
+            element = new PdfTextElement(totalPrice.ToString(), font);
+            element.StringFormat = new PdfStringFormat(PdfTextAlignment.Right);
+            element.Draw(currentPage, new RectangleF(15, result.Bounds.Bottom + 22, result.Bounds.Width, result.Bounds.Height));
+            //Draw PDF grid into the PDF page.
+
+            using (MemoryStream stream = new MemoryStream())
+            {
+                //Saving the PDF document into the stream.
+                pdfDocument.Save(stream);
+                //Closing the PDF document.
+                pdfDocument.Close(true);
+                stream.Position = 0;
+                await JS.SaveAs("Sample.pdf", stream.ToArray());
+
+            }
         }
     }
 

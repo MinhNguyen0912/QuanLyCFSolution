@@ -117,10 +117,11 @@
                 // random color
                 var data = new List<double>();
 
-                for (int i = 7; i >=0; i--)
+                for (int i = 0; i <7; i++)
                 {
+                    Console.WriteLine((Int32)DateTime.Now.DayOfWeek);
                     double totalPrice = 0;
-                    var currentStartTime = DateTime.Now.Date.AddDays(-1 * (Int32)DateTime.Now.DayOfWeek-i+1+7);
+                    var currentStartTime = DateTime.Now.Date.AddDays(-1 * (Int32)DateTime.Now.DayOfWeek+1+i);
                     var currentEndTime = currentStartTime.AddDays(1);
                     var bills = await _billRepos.GetAllInRangeTime(currentStartTime.ToString("yyyy-MM-dd"), currentEndTime.ToString("yyyy-MM-dd"));
                     if (bills.Count == 0)
